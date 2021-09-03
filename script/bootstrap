@@ -1,0 +1,25 @@
+#!/bin/bash
+###############################################################################
+# Copyright (C) Intel Corporation
+#
+# SPDX-License-Identifier: MIT
+###############################################################################
+# Build base dependencies.
+
+set -o errexit
+
+
+SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 ; pwd -P )"
+
+# Read command line options
+. "${SCRIPT_DIR}/_buildopts.sh" \
+    --name bootstrap \
+    --desc "Build base dependencies." \
+    -- "$@"
+
+pushd "${PROJ_DIR}"
+  python3 -m venv _build-venv
+  . _build-venv/bin/activate
+  python -m pip install -r "${PROJ_DIR}/requirements.txt"
+  export pybind11_DIR="$(python -m pybind11 --cmakedir)"
+popd
