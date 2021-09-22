@@ -1,5 +1,4 @@
-
-# Copyright(c) 2018 Intel Corporation
+# Copyright(c) 2021 Intel Corporation
 
 # Permission is hereby granted, free of charge, to any person obtaining a
 # copy of this software and associated documentation files(the "Software"),
@@ -26,6 +25,9 @@ include $(CLEAR_VARS)
 ONEVPL_SEARCH_PATH_32 := /vendor/lib
 ONEVPL_SEARCH_PATH_64 := /vendor/lib64
 
+MFX_MODULES_DIR_32 := /vendor/lib
+MFX_MODULES_DIR_64 := /vendor/lib64
+
 LOCAL_SRC_FILES := \
     linux/mfxloader.cpp \
     vpl/mfx_dispatcher_vpl.cpp \
@@ -44,7 +46,6 @@ LOCAL_CPPFLAGS := \
     -fexceptions \
     -DANDROID \
     -DMFX_DEPRECATED_OFF \
-    -DMFX_MODULES_DIR=\"/usr/lib/x86_64-linux-gnu\" \
     -DVPL_EXPORTS \
     -D_FORTIFY_SOURCE=2
 
@@ -59,10 +60,12 @@ LOCAL_CPPFLAGS += -Wl,--version-script=$(LOCAL_PATH)/linux/libvpl.map
 LOCAL_CFLAGS := $(LOCAL_CPPFLAGS)
 
 LOCAL_CFLAGS_32 += \
-      -DONEVPL_SEARCH_PATH="\"$(ONEVPL_SEARCH_PATH_32)\""
+      -DONEVPL_SEARCH_PATH="\"$(ONEVPL_SEARCH_PATH_32)\"" \
+      -DMFX_MODULES_DIR="\"$(MFX_MODULES_DIR_32)\""
 
 LOCAL_CFLAGS_64 += \
-      -DONEVPL_SEARCH_PATH="\"$(ONEVPL_SEARCH_PATH_64)\""
+      -DONEVPL_SEARCH_PATH="\"$(ONEVPL_SEARCH_PATH_64)\"" \
+      -DMFX_MODULES_DIR="\"$(MFX_MODULES_DIR_64)\""
 
 LOCAL_C_INCLUDES  := \
     $(LOCAL_PATH)/../api
