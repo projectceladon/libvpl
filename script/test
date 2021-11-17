@@ -1,0 +1,28 @@
+#!/bin/bash
+###############################################################################
+# Copyright (C) Intel Corporation
+#
+# SPDX-License-Identifier: MIT
+###############################################################################
+# Run basic tests on base.
+
+set -o errexit
+
+
+# Set script folder
+SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 ; pwd -P )"
+
+# Set root folder
+PROJ_DIR="$( dirname "${SCRIPT_DIR}" )"
+
+result_all=0
+
+pushd "${PROJ_DIR}"
+  BUILD_DIR=_build
+  pushd "${BUILD_DIR}"
+    ctest  --config "${COFIG_OPT}"
+    result_all=$?
+  popd
+popd
+
+exit $result_all

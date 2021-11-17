@@ -1,0 +1,23 @@
+#!/bin/bash
+###############################################################################
+# Copyright (C) Intel Corporation
+#
+# SPDX-License-Identifier: MIT
+###############################################################################
+# Install base.
+
+set -o errexit
+
+
+SCRIPT_DIR="$( cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 ; pwd -P )"
+
+# Read command line options
+. "${SCRIPT_DIR}/_buildopts.sh" \
+    --name install \
+    --desc "Install base." \
+    -- "$@"
+
+pushd "${PROJ_DIR}"
+    BUILD_DIR=_build
+    cmake --build "${BUILD_DIR}" --config "${COFIG_OPT}" --target install
+popd

@@ -1,0 +1,11 @@
+
+cc_library_headers {
+
+    name: "libvpl_headers",
+    export_include_dirs: [
+        "vpl",
+    ],
+
+    vendor: true,
+}
+
