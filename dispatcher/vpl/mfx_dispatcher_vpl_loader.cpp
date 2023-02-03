@@ -242,8 +242,8 @@ mfxStatus LoaderCtxVPL::SearchDirForLibs(STRING_TYPE searchDir,
             if (strstr(currFile->d_name, ".so")) {
                 // library names must begin with "libvpl*" or "libmfx*"
                 if ((strstr(currFile->d_name, "libvpl") != currFile->d_name) &&
-                    (strcmp(currFile->d_name, "libmfx-gen.so.1.2") != 0) &&
-                    (strcmp(currFile->d_name, "libmfxhw64.so.1") != 0))
+                    (strcmp(currFile->d_name, "libmfx-gen.so") != 0) &&
+                    (strcmp(currFile->d_name, "libmfxhw64.so") != 0))
                     continue;
 
                 // special case: do not include dispatcher itself (libmfx.so*, libvpl.so*) or tracer library
@@ -565,6 +565,10 @@ mfxStatus LoaderCtxVPL::BuildListOfCandidateLibs() {
     // fourth priority: ONEVPL_SEARCH_PATH environment variable
     searchDirList.clear();
     ParseEnvSearchPaths("ONEVPL_SEARCH_PATH", searchDirList);
+#if defined(ANDROID)
+    searchDirList.push_back("/vendor/lib");
+    searchDirList.push_back("/vendor/lib64");
+#endif // ANDROID
     it = searchDirList.begin();
     while (it != searchDirList.end()) {
         STRING_TYPE nextDir = (*it);

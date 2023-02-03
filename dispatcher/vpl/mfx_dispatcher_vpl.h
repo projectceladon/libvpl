@@ -15,10 +15,19 @@
 #include <string>
 #include <vector>
 
+#if defined(ANDROID)
+#include <android/log.h>
+#endif
+
 #include "vpl/mfxdispatcher.h"
 #include "vpl/mfxvideo.h"
 
 #include "./mfx_dispatcher_vpl_log.h"
+
+#if defined(ANDROID)
+#define MFX_VPL_LOG_TAG "omx_vpl"
+#define MFX_VPL_LOG_LEVEL ANDROID_LOG_INFO
+#endif
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <windows.h>
