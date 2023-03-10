@@ -4,6 +4,7 @@
   # SPDX-License-Identifier: MIT
   ############################################################################*/
 
+#include <log/log.h>
 #include "vpl/mfx_dispatcher_vpl.h"
 
 // exported functions for API >= 2.0
