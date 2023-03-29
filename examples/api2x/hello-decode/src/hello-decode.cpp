@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
     mfxVideoParam decodeParams      = {};
 
     // variables used only in 2.x version
-    mfxConfig cfg[3];
-    mfxVariant cfgVal[3];
+    mfxConfig cfg[4];
+    mfxVariant cfgVal[4];
     mfxLoader loader = NULL;
 
     // Parse command line args to cliParams
@@ -97,6 +97,15 @@ int main(int argc, char *argv[]) {
                                      (mfxU8 *)"mfxImplDescription.ApiVersion.Version",
                                      cfgVal[2]);
     VERIFY(MFX_ERR_NONE == sts, "MFXSetConfigFilterProperty failed for API version");
+
+    mfxU8* filter;
+    filter = (mfxU8*)"mfxExtendedDeviceId.DRMRenderNodeNum";
+    cfg[3] = MFXCreateConfig(loader);
+    cfgVal[3].Type = MFX_VARIANT_TYPE_U32;
+    cfgVal[3].Data.U32 = 129;
+    sts = MFXSetConfigFilterProperty(cfg[3], filter, cfgVal[3]);
+    if (MFX_ERR_NONE != sts)
+        printf("MFXSetConfigFilterProperty 3 error=%d\n", sts);
 
     sts = MFXCreateSession(loader, 0, &session);
     VERIFY(MFX_ERR_NONE == sts,
