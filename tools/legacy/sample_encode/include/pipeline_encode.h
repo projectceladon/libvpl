@@ -413,7 +413,7 @@ protected:
     mfxU32 m_nNumView;
     mfxU32 m_nFramesToProcess; // number of frames to process
 
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID) 
     std::string m_strDevicePath; //path to device for processing
 #endif
 

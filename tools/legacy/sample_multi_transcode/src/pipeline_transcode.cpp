@@ -15,6 +15,7 @@
 #include <cstring>
 #include <memory>
 #include <set>
+#include <cmath>
 #include "mfx_itt_trace.h"
 #include "pipeline_transcode.h"
 #include "sample_utils.h"
