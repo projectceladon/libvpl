@@ -168,7 +168,7 @@ struct sInputParams {
     mfxIMPL ImpLib;
     mfxAccelerationMode accelerationMode;
 
-    #if defined(LINUX32) || defined(LINUX64)
+    #if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     std::string strDevicePath; // path to device for processing
     #endif
 

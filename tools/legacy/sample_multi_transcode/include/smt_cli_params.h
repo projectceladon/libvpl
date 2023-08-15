@@ -136,7 +136,7 @@ typedef struct sInputParams {
     mfxPriority priority;
     // common parameters
     mfxIMPL libType; // Type of used mediaSDK library
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     std::string strDevicePath;
 #endif
 // Extended device ID info, available in 2.6 and newer APIs
