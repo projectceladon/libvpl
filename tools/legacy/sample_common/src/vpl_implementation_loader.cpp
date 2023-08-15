@@ -9,7 +9,7 @@
 #include "sample_utils.h"
 #include "vpl/mfxdispatcher.h"
 
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     #include <link.h>
     #include <string.h>
 #else
@@ -580,7 +580,7 @@ mfxStatus MainVideoSession::PrintLibInfo(VPLImplementationLoader* Loader) {
     }
 
     // Module Name
-#if (defined(LINUX32) || defined(LINUX64))
+#if (defined(LINUX32) || defined(LINUX64)) || defined(ANDROID)
     #ifdef ONEVPL_EXPERIMENTAL
     printf("    DRMRenderNodeNum: %d \n", Loader->GetDRMRenderNodeNumUsed());
     #endif

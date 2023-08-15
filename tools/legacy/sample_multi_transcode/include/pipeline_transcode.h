@@ -140,8 +140,8 @@ public:
 struct PreEncAuxBuffer {
     mfxEncodeCtrl encCtrl;
     mfxU16 Locked;
-    mfxENCInput encInput;
-    mfxENCOutput encOutput;
+    mfxENCInput* encInput;
+    mfxENCOutput* encOutput;
 };
 
 struct ExtendedSurface {

@@ -8,6 +8,7 @@
 #include "mfx_samples_config.h"
 #include "plugin_utils.h"
 #include "sample_defs.h"
+#include "mfxdeprecated.h"
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <d3d9.h>
@@ -37,6 +38,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 using namespace TranscodingSample;
 
