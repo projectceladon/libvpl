@@ -1,0 +1,195 @@
+// Copyright(c) 2023 Intel Corporation
+
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files(the "Software"),
+// to deal in the Software without restriction, including without limitation
+// the rights to use, copy, modify, merge, publish, distribute, sublicense,
+// and / or sell copies of the Software, and to permit persons to whom the
+// Software is furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+// THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+// OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+// OTHER DEALINGS IN THE SOFTWARE.
+
+cc_library_headers {
+
+    name: "media_sdk_compatibility_headers",
+    export_include_dirs: [
+        "media_sdk_compatibility_headers",
+    ],
+
+    vendor: true,
+}
+
+mfx_cc_defaults {
+
+    name: "vpl_samples_default",
+
+    header_libs: [
+        "libvpl_headers",
+        "media_sdk_compatibility_headers",
+    ],
+
+    shared_libs: [
+    ],
+
+    cflags: [
+        "-std=c++14",
+        "-Wall",
+        "-fexceptions",
+        "-Wno-unused-variable",
+        "-Wunused-parameter",
+        "-Wmissing-field-initializers",
+        "-DMFX_DEPRECATED_OFF",
+        "-DLIBVA_SUPPORT",
+        "-DLIBVA_ANDROID_SUPPORT",
+    ],
+
+    include_dirs: [
+        "hardware/intel/external/libva",
+    ],
+
+    rtti: true,
+    vendor: true,
+}
+
+cc_library_static {
+
+    name: "vpl_libsample_common",
+
+    defaults: [
+        "vpl_samples_default",
+    ],
+
+    local_include_dirs: [
+        "sample_common/include",
+    ],
+
+    export_include_dirs: [
+        "sample_common/include",
+    ],
+
+    srcs: [
+        "sample_common/src/*.cpp",
+        "sample_common/src/vm/*.cpp",
+    ],
+}
+
+cc_binary {
+
+    name: "vpl_sample_decode",
+
+    defaults: [
+        "vpl_samples_default",
+    ],
+
+    srcs: [
+        "sample_decode/src/*.cpp",
+    ],
+
+    local_include_dirs: [
+        "sample_decode/include",
+    ],
+
+    shared_libs: [
+        "libvpl",
+        "libva",
+        "libva-android",
+    ],
+
+    static_libs: [
+        "vpl_libsample_common",
+    ],
+}
+
+cc_binary {
+
+    name: "vpl_sample_encode",
+
+    defaults: [
+        "vpl_samples_default",
+    ],
+
+    srcs: [
+        "sample_encode/src/*.cpp",
+    ],
+
+    local_include_dirs: [
+        "sample_encode/include",
+    ],
+
+    shared_libs: [
+        "libvpl",
+        "libva",
+        "libva-android",
+    ],
+
+    static_libs: [
+        "vpl_libsample_common",
+    ],
+}
+
+cc_binary {
+
+    name: "vpl_sample_multi_transcode",
+
+    defaults: [
+        "vpl_samples_default",
+    ],
+
+    srcs: [
+        "sample_multi_transcode/src/*.cpp",
+    ],
+
+    local_include_dirs: [
+        "sample_multi_transcode/include",
+    ],
+
+    shared_libs: [
+        "libvpl",
+        "libva",
+        "libva-android",
+    ],
+
+    cflags: [
+        "-DMFX_ONEVPL",
+    ],
+
+    static_libs: [
+        "vpl_libsample_common",
+    ],
+}
+
+cc_binary {
+
+    name: "vpl_sample_vpp",
+
+    defaults: [
+        "vpl_samples_default",
+    ],
+
+    srcs: [
+        "sample_vpp/src/*.cpp",
+    ],
+
+    local_include_dirs: [
+        "sample_vpp/include",
+    ],
+
+    shared_libs: [
+        "libvpl",
+        "libva",
+        "libva-android",
+    ],
+
+    static_libs: [
+        "vpl_libsample_common",
+    ],
+}
