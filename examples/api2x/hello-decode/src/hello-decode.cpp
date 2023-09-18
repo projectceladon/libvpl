@@ -102,7 +102,7 @@ int main(int argc, char *argv[]) {
     filter = (mfxU8*)"mfxExtendedDeviceId.DRMRenderNodeNum";
     cfg[3] = MFXCreateConfig(loader);
     cfgVal[3].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[3].Data.U32 = 129;
+    cfgVal[3].Data.U32 = 128;
     sts = MFXSetConfigFilterProperty(cfg[3], filter, cfgVal[3]);
     if (MFX_ERR_NONE != sts)
         printf("MFXSetConfigFilterProperty 3 error=%d\n", sts);

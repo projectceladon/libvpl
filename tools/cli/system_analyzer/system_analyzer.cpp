@@ -20,7 +20,7 @@
     #include <unistd.h>
     #include "dlfcn.h"
     #include "va/va.h"
-    #include "va/va_drm.h"
+    #include "va//drm/va_drm.h"
 #endif
 
 typedef struct gpuinfo {
