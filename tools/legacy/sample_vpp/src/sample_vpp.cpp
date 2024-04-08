@@ -3,7 +3,8 @@
   #
   # SPDX-License-Identifier: MIT
   ############################################################################*/
-
+// VPP tool using Intel® Video Processing Library (Intel® VPL)
+#include "parameters_dumper.h"
 #include "sample_vpp_pts.h"
 #include "sample_vpp_roi.h"
 #include "sample_vpp_utils.h"
@@ -137,6 +138,11 @@ static void vppDefaultInitParams(sInputParams* pParams, sFiltersParam* pDefaultF
 
     pParams->colorfillParam.clear();
     pParams->colorfillParam.push_back(*pDefaultFiltersParam->pColorfillParam);
+
+    pParams->videoSignalInfoIn.clear();
+    pParams->videoSignalInfoIn.push_back(*pDefaultFiltersParam->pVideoSignalInfoIn);
+    pParams->videoSignalInfoOut.clear();
+    pParams->videoSignalInfoOut.push_back(*pDefaultFiltersParam->pVideoSignalInfoOut);
 
     // ROI check
     pParams->roiCheckParam.mode    = ROI_FIX_TO_FIX; // ROI check is disabled
@@ -272,7 +278,7 @@ mfxU32 GetSurfaceSize(mfxU32 FourCC, mfxU32 width, mfxU32 height) {
     return nbytes;
 }
 
-int main(int argc, char* argv[]) {
+int sample_vpp_main(int argc, char* argv[]) {
     mfxStatus sts       = MFX_ERR_NONE;
     mfxU32 nFrames      = 0;
     mfxU16 nInStreamInd = 0;
@@ -345,6 +351,8 @@ int main(int argc, char* argv[]) {
     sVideoSignalInfoParam defaultVideoSignalInfoParam;
     sMirroringParam defaultMirroringParam;
     sColorFillParam defaultColorfillParam;
+    sVideoSignalInfo defaultInVideoSignalInfoParam  = {};
+    sVideoSignalInfo defaultOutVideoSignalInfoParam = {};
 
     sFiltersParam defaultFiltersParam = { &defaultOwnFrameInfo,
                                           &defaultDIParam,
@@ -366,7 +374,9 @@ int main(int argc, char* argv[]) {
                                           &defaultSVCParam,
                                           &defaultVideoSignalInfoParam,
                                           &defaultMirroringParam,
-                                          &defaultColorfillParam };
+                                          &defaultColorfillParam,
+                                          &defaultInVideoSignalInfoParam,
+                                          &defaultOutVideoSignalInfoParam };
 
     //reset pointers to the all internal resources
     MSDK_ZERO_MEMORY(Resources);
@@ -397,7 +407,7 @@ int main(int argc, char* argv[]) {
     // change Params.frameInfoOut[0].FourCC to nv12 for processing in gen lib.
     // So, when it writes vpp output, it refers forceOutputFourcc to convert nv12 to -dcc format.
     //
-    // In case of vpl, ignore these steps and use original format (i420)
+    // In case of Intel® VPL, ignore these steps and use original format (i420)
     if (Params.ImpLib == MFX_IMPL_SOFTWARE && Params.forcedOutputFourcc != 0) {
         Params.frameInfoOut[0].FourCC = Params.forcedOutputFourcc;
         Params.forcedOutputFourcc     = 0;
@@ -542,6 +552,13 @@ int main(int argc, char* argv[]) {
         Params.bPartialAccel = false;
     }
 
+#ifdef ONEVPL_EXPERIMENTAL
+    sts = SetParameters((mfxSession)Resources.pProcessor->mfxSession,
+                        mfxParamsVideo,
+                        Params.m_vpp_cfg);
+    MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
+
     if (Params.bPerf) {
         for (int i = 0; i < Resources.numSrcFiles; i++) {
             sts = yuvReaders[i].PreAllocateFrameChunk(&mfxParamsVideo,
@@ -614,6 +631,17 @@ int main(int argc, char* argv[]) {
         buf_read.resize(frame_size);
     }
 
+    // Dumping components configuration if required
+    if (!Params.dump_file.empty()) {
+        CParametersDumper::DumpLibraryConfiguration(Params.dump_file,
+                                                    NULL,
+                                                    frameProcessor.pmfxVPP,
+                                                    NULL,
+                                                    NULL,
+                                                    &mfxParamsVideo,
+                                                    NULL);
+    }
+
     //---------------------------------------------------------
     do {
         if (bNeedReset) {
@@ -628,6 +656,10 @@ int main(int argc, char* argv[]) {
                 WipeResources(&Resources);
                 WipeParams(&Params);
             });
+#ifdef ONEVPL_EXPERIMENTAL
+            sts = SetParameters(Resources.pProcessor->mfxSession, mfxParamsVideo, Params.m_vpp_cfg);
+            MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
 
             sts = ConfigVideoEnhancementFilters(&Params, &Resources, paramID);
             MSDK_CHECK_STATUS_SAFE(sts, "ConfigVideoEnchancementFilters failed", {

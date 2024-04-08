@@ -45,7 +45,6 @@ mfx_cc_defaults {
         "-Wall",
         "-fexceptions",
         "-Wno-unused-variable",
-        "-Wunused-parameter",
         "-Wmissing-field-initializers",
         "-DMFX_DEPRECATED_OFF",
         "-DLIBVA_SUPPORT",

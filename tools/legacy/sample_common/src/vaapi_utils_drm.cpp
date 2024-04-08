@@ -22,6 +22,7 @@ constexpr mfxU32 MFX_DRI_RENDER_START_INDEX = 128;
 constexpr mfxU32 MFX_DRI_CARD_START_INDEX   = 0;
 constexpr mfxU32 MFX_DRM_DRIVER_NAME_LEN    = 4;
 const char* MFX_DRM_INTEL_DRIVER_NAME       = "i915";
+const char* MFX_DRM_INTEL_DRIVER_XE_NAME    = "xe";
 const char* MFX_DRI_PATH                    = "/dev/dri/";
 const char* MFX_DRI_NODE_RENDER             = "renderD";
 const char* MFX_DRI_NODE_CARD               = "card";
@@ -60,7 +61,8 @@ int open_first_intel_adapter(int type) {
             continue;
 
         if (!get_drm_driver_name(fd, driverName, MFX_DRM_DRIVER_NAME_LEN) &&
-            msdk_match(driverName, MFX_DRM_INTEL_DRIVER_NAME)) {
+            (msdk_match(driverName, MFX_DRM_INTEL_DRIVER_NAME) ||
+             msdk_match(driverName, MFX_DRM_INTEL_DRIVER_XE_NAME))) {
             return fd;
         }
         close(fd);
@@ -70,10 +72,40 @@ int open_first_intel_adapter(int type) {
 }
 
 int open_intel_adapter(const std::string& devicePath, int type) {
+    int fd = -1;
+
     if (devicePath.empty())
         return open_first_intel_adapter(type);
 
-    int fd = open(devicePath.c_str(), O_RDWR);
+    switch (type) {
+        case MFX_LIBVA_DRM:
+        case MFX_LIBVA_AUTO:
+            fd = open(devicePath.c_str(), O_RDWR);
+            break;
+        case MFX_LIBVA_DRM_MODESET:
+            // convert corresponsing render node to card node
+            if (devicePath.find(MFX_DRI_NODE_RENDER) != std::string::npos) {
+                std::string newDevicePath, renderNum;
+                newDevicePath = renderNum = devicePath;
+
+                newDevicePath.replace(
+                    devicePath.find(MFX_DRI_NODE_RENDER),
+                    devicePath.length(),
+                    "card" + std::to_string(
+                                 std::stoi(renderNum.erase(0,
+                                                           devicePath.find(MFX_DRI_NODE_RENDER) +
+                                                               sizeof(MFX_DRI_NODE_RENDER) - 1)) -
+                                 128));
+
+                fd = open(newDevicePath.c_str(), O_RDWR);
+            }
+            else if (devicePath.find(MFX_DRI_NODE_CARD) != std::string::npos) {
+                fd = open(devicePath.c_str(), O_RDWR);
+            }
+            break;
+        default:
+            throw std::invalid_argument("Wrong libVA backend type");
+    }
 
     if (fd < 0) {
         printf("Failed to open specified device\n");
@@ -82,7 +114,8 @@ int open_intel_adapter(const std::string& devicePath, int type) {
 
     char driverName[MFX_DRM_DRIVER_NAME_LEN + 1] = {};
     if (!get_drm_driver_name(fd, driverName, MFX_DRM_DRIVER_NAME_LEN) &&
-        msdk_match(driverName, MFX_DRM_INTEL_DRIVER_NAME)) {
+        (msdk_match(driverName, MFX_DRM_INTEL_DRIVER_NAME) ||
+         msdk_match(driverName, MFX_DRM_INTEL_DRIVER_XE_NAME))) {
         return fd;
     }
     else {
@@ -185,6 +218,7 @@ drmRenderer::drmRenderer(int fd, mfxI32 monitorType)
     #if defined(DRM_LINUX_HDR_SUPPORT)
           m_hdrMetaData({}),
     #endif
+          m_bRequiredTiled4(false),
           m_pCurrentRenderTargetSurface(NULL) {
     bool res = false;
 
@@ -232,32 +266,6 @@ drmRenderer::~drmRenderer() {
 
 drmModeObjectPropertiesPtr drmRenderer::getProperties(int fd, int objectId, int32_t objectTypeId) {
     return m_drmlib.drmModeObjectGetProperties(fd, objectId, objectTypeId);
-}
-
-bool drmRenderer::getCRTCProperties(int fd, int crtcId) {
-    if (m_crtcProperties == NULL)
-        m_crtcProperties = getProperties(fd, crtcId, DRM_MODE_OBJECT_CRTC);
-    return m_crtcProperties != NULL;
-}
-
-uint32_t drmRenderer::getCRTCPropertyId(const char* propNameToFind) {
-    if (!getCRTCProperties(m_fd, m_crtcID)) {
-        return 0;
-    }
-
-    drmModePropertyPtr property;
-    uint32_t i, id = 0;
-    for (i = 0; i < m_crtcProperties->count_props; i++) {
-        property = m_drmlib.drmModeGetProperty(m_fd, m_crtcProperties->props[i]);
-        if (msdk_match(property->name, propNameToFind))
-            id = property->prop_id;
-
-        m_drmlib.drmModeFreeProperty(property);
-
-        if (id)
-            break;
-    }
-    return id;
 }
 
 bool drmRenderer::getConnectorProperties(int fd, int connectorId) {
@@ -487,6 +495,10 @@ bool drmRenderer::getPlane() {
     #endif
                         (plane->formats[j] == DRM_FORMAT_NV12)) {
                         m_planeID = plane->plane_id;
+
+                        if (!getAllFormatsAndModifiers())
+                            printf("drmrender: failed to obtain plane properties\n");
+
                         m_drmlib.drmModeFreePlane(plane);
                         m_drmlib.drmModeFreePlaneResources(planes);
                         return true;
@@ -498,6 +510,62 @@ bool drmRenderer::getPlane() {
     }
     m_drmlib.drmModeFreePlaneResources(planes);
     return false;
+}
+
+bool drmRenderer::getAllFormatsAndModifiers() {
+    drmModeObjectProperties* planeProps = NULL;
+    drmModePropertyRes** planePropsInfo = NULL;
+    drmModePropertyBlobPtr blob;
+    #if defined(DRM_LINUX_FORMAT_MODIFIER_BLOB_SUPPORT)
+    drmModeFormatModifierIterator iter = { 0 };
+    #endif
+    uint32_t i;
+
+    planeProps = m_drmlib.drmModeObjectGetProperties(m_fd, m_planeID, DRM_MODE_OBJECT_PLANE);
+    if (!planeProps)
+        return false;
+
+    planePropsInfo =
+        (drmModePropertyRes**)malloc(planeProps->count_props * sizeof(drmModePropertyRes*));
+
+    for (i = 0; i < planeProps->count_props; i++)
+        planePropsInfo[i] = m_drmlib.drmModeGetProperty(m_fd, planeProps->props[i]);
+
+    for (i = 0; i < planeProps->count_props; i++) {
+        if (strcmp(planePropsInfo[i]->name, "IN_FORMATS"))
+            continue;
+
+        blob = m_drmlib.drmModeGetPropertyBlob(m_fd, planeProps->prop_values[i]);
+        if (!blob)
+            continue;
+
+    #if defined(DRM_LINUX_FORMAT_MODIFIER_BLOB_SUPPORT)
+        while (m_drmlib.drmModeFormatModifierBlobIterNext(blob, &iter)) {
+            if (iter.mod == DRM_FORMAT_MOD_INVALID)
+                break;
+
+        #if defined(DRM_LINUX_MODIFIER_TILED4_SUPPORT)
+            if ((iter.fmt == DRM_FORMAT_NV12 || iter.fmt == DRM_FORMAT_P010) &&
+                (iter.mod == I915_FORMAT_MOD_4_TILED)) {
+                m_bRequiredTiled4 = true;
+                break;
+            }
+        #endif
+        }
+    #endif
+        m_drmlib.drmModeFreePropertyBlob(blob);
+    }
+
+    if (planePropsInfo) {
+        for (i = 0; i < planeProps->count_props; i++) {
+            if (planePropsInfo[i])
+                m_drmlib.drmModeFreeProperty(planePropsInfo[i]);
+        }
+        free(planePropsInfo);
+    }
+
+    m_drmlib.drmModeFreeObjectProperties(planeProps);
+    return true;
 }
 
 bool drmRenderer::setMaster() {
@@ -742,29 +810,36 @@ void* drmRenderer::acquire(mfxMemId mid) {
             || VA_FOURCC_P010 == vmid->m_fourcc
     #endif
         ) {
-            struct drm_i915_gem_set_tiling set_tiling;
-
             pixel_format = DRM_FORMAT_NV12;
     #if defined(DRM_LINUX_P010_SUPPORT)
             if (VA_FOURCC_P010 == vmid->m_fourcc)
                 pixel_format = DRM_FORMAT_P010;
     #endif
-
-            memset(&set_tiling, 0, sizeof(set_tiling));
-            set_tiling.handle      = flink_open.handle;
-            set_tiling.tiling_mode = I915_TILING_Y;
-            set_tiling.stride      = vmid->m_image.pitches[0];
-            ret = m_drmlib.drmIoctl(m_fd, DRM_IOCTL_I915_GEM_SET_TILING, &set_tiling);
-            if (ret) {
-                printf("DRM_IOCTL_I915_GEM_SET_TILING Failed ret = %d\n", ret);
-                return NULL;
-            }
-
             handles[1]   = flink_open.handle;
             pitches[1]   = vmid->m_image.pitches[1];
             offsets[1]   = vmid->m_image.offsets[1];
             modifiers[0] = modifiers[1] = I915_FORMAT_MOD_Y_TILED;
-            flags = 2; // DRM_MODE_FB_MODIFIERS   (1<<1) /* enables ->modifer[]
+            flags                       = DRM_MODE_FB_MODIFIERS;
+
+            if (m_bRequiredTiled4) {
+    #if defined(DRM_LINUX_MODIFIER_TILED4_SUPPORT)
+                modifiers[0] = modifiers[1] = I915_FORMAT_MOD_4_TILED;
+    #endif
+            }
+            else {
+                modifiers[0] = modifiers[1] = I915_FORMAT_MOD_Y_TILED;
+
+                struct drm_i915_gem_set_tiling set_tiling;
+                memset(&set_tiling, 0, sizeof(set_tiling));
+                set_tiling.handle      = flink_open.handle;
+                set_tiling.tiling_mode = I915_TILING_Y;
+                set_tiling.stride      = vmid->m_image.pitches[0];
+                ret = m_drmlib.drmIoctl(m_fd, DRM_IOCTL_I915_GEM_SET_TILING, &set_tiling);
+                if (ret) {
+                    printf("DRM_IOCTL_I915_GEM_SET_TILING Failed ret = %d\n", ret);
+                    return NULL;
+                }
+            }
         }
         else {
             pixel_format = DRM_FORMAT_XRGB8888;

@@ -5,10 +5,10 @@
 //==============================================================================
 
 ///
-/// A minimal oneAPI Video Processing Library (oneVPL) transcode application
-/// using oneVPL 2.2 API features including internal memory. For more information see:
+/// A minimal Intel® Video Processing Library (Intel® VPL) transcode application
+/// using Intel® VPL 2.2 API features including internal memory. For more information see:
 /// https://software.intel.com/content/www/us/en/develop/articles/upgrading-from-msdk-to-onevpl.html
-/// https://oneapi-src.github.io/oneAPI-spec/elements/oneVPL/source/index.html
+/// https://intel.github.io/libvpl
 ///
 /// @file
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     sink = fopen(OUTPUT_FILE, "wb");
     VERIFY(sink, "Could not create output file");
 
-    // Initialize VPL session
+    // Initialize session
     loader = MFXLoad();
     VERIFY(NULL != loader, "MFXLoad failed -- is implementation in path?");
 
@@ -177,6 +177,16 @@ int main(int argc, char *argv[]) {
 
     encodeParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
 
+    // Validate video encode parameters
+    // - In this example the validation result is written to same structure
+    // - MFX_WRN_INCOMPATIBLE_VIDEO_PARAM is returned if some of the video parameters are not supported,
+    //   instead the encoder will select suitable parameters closest matching the requested configuration,
+    //   and it's ignorable.
+    sts = MFXVideoENCODE_Query(session, &encodeParams, &encodeParams);
+    if (sts == MFX_WRN_INCOMPATIBLE_VIDEO_PARAM)
+        sts = MFX_ERR_NONE;
+    VERIFY(MFX_ERR_NONE == sts, "Encode query failed");
+
     // Initialize the encoder
     sts = MFXVideoENCODE_Init(session, &encodeParams);
     VERIFY(MFX_ERR_NONE == sts, "Could not initialize Encode");
@@ -206,7 +216,7 @@ int main(int argc, char *argv[]) {
                 // When the internal memory model is used,
                 // MFX_WRN_ALLOC_TIMEOUT_EXPIRED is returned when all the surfaces are currently in use and timeout set by mfxExtAllocationHints for allocation of new surfaces through functions DecodeFrameAsync expired.
                 // Repeat the call in a few milliseconds.
-                // For more information, please check oneVPL API documentation.
+                // For more information, please check Intel® VPL API documentation.
                 if (sts == MFX_WRN_ALLOC_TIMEOUT_EXPIRED) {
                     if (timeout_count > MAX_TIMEOUT_COUNT) {
                         sts = MFX_ERR_DEVICE_FAILED;

@@ -180,9 +180,13 @@ typedef struct sInputParams {
     std::string strSrcFile; // source bitstream file
     std::string strDstFile; // destination bitstream file
     std::string strDumpVppCompFile; // VPP composition output dump file
-    std::string strMfxParamsDumpFile;
+    std::string dump_file;
 
     std::string strTCBRCFilePath;
+
+    std::string m_encode_cfg;
+    std::string m_decode_cfg;
+    std::string m_vpp_cfg;
 
     // specific encode parameters
     mfxU16 nTargetUsage;
@@ -222,6 +226,8 @@ typedef struct sInputParams {
 
     mfxU32 FrameNumberPreference; // how many surfaces user wants
     mfxU32 MaxFrameNumber; // maximum frames for transcoding
+    mfxU16 prolonged;
+    mfxU16 ExactNframe;
     mfxU32 numSurf4Comp;
     mfxU16 numTiles4Comp;
 
@@ -247,6 +253,7 @@ typedef struct sInputParams {
     mfxU16 GopOptFlag;
     mfxU16 AdaptiveI;
     mfxU16 AdaptiveB;
+    mfxU16 AdaptiveCQM;
 
     mfxU16 WeightedPred;
     mfxU16 WeightedBiPred;
@@ -279,6 +286,8 @@ typedef struct sInputParams {
     mfxU16 nQPP;
     mfxU16 nQPB;
     bool bDisableQPOffset;
+    bool bSetQPOffset;
+    mfxU16 QPOffset[8];
     mfxU8 nMinQPI;
     mfxU8 nMaxQPI;
     mfxU8 nMinQPP;
@@ -404,7 +413,10 @@ typedef struct sInputParams {
 #endif
 #ifdef ONEVPL_EXPERIMENTAL
     bool PercEncPrefilter;
+    mfxU32 TuneEncodeQuality;
 #endif
+    mfxU16 ScenarioInfo;
+    mfxU16 ContentInfo;
     eAPIVersion verSessionInit;
 
     // set structure to define values
@@ -453,8 +465,11 @@ typedef struct sInputParams {
               strSrcFile(),
               strDstFile(),
               strDumpVppCompFile(),
-              strMfxParamsDumpFile(),
+              dump_file(),
               strTCBRCFilePath(),
+              m_encode_cfg(),
+              m_decode_cfg(),
+              m_vpp_cfg(),
               nTargetUsage(0),
               dDecoderFrameRateOverride(0.0),
               dEncoderFrameRateOverride(0.0),
@@ -484,6 +499,7 @@ typedef struct sInputParams {
               eModeExt(Native),
               FrameNumberPreference(0),
               MaxFrameNumber(MFX_INFINITE),
+              ExactNframe(0),
               numSurf4Comp(0),
               numTiles4Comp(0),
               nSlices(0),
@@ -506,6 +522,7 @@ typedef struct sInputParams {
               GopOptFlag(0),
               AdaptiveI(0),
               AdaptiveB(0),
+              AdaptiveCQM(0),
               WeightedPred(0),
               WeightedBiPred(0),
               ExtBrcAdaptiveLTR(0),
@@ -529,6 +546,8 @@ typedef struct sInputParams {
               nQPP(0),
               nQPB(0),
               bDisableQPOffset(false),
+              bSetQPOffset(false),
+              QPOffset{ 0 },
               nMinQPI(0),
               nMaxQPI(0),
               nMinQPP(0),
@@ -621,7 +640,10 @@ typedef struct sInputParams {
 #endif
 #ifdef ONEVPL_EXPERIMENTAL
               PercEncPrefilter(false),
+              TuneEncodeQuality(0),
 #endif
+              ScenarioInfo(0),
+              ContentInfo(0),
               verSessionInit(API_2X) {
 #ifdef ENABLE_MCTF
         mctfParam.mode                  = VPP_FILTER_DISABLED;

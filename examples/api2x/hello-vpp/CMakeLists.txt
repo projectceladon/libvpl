@@ -87,7 +87,24 @@ if(NOT has_parent)
   add_custom_target(run ${TARGET} ${RUNARGS})
 else()
   install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-                                    COMPONENT dev)
+                                    COMPONENT ${VPL_COMPONENT_DEV})
+endif()
+
+# copy dependent dlls to target location
+if(WIN32)
+  if(${CMAKE_VERSION} VERSION_LESS "3.26")
+    message(
+      STATUS
+        "CMake Version less than 3.26, unable to copy dependent DLLs to target location"
+    )
+  else()
+    add_custom_command(
+      TARGET ${TARGET}
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${TARGET}>
+              $<TARGET_RUNTIME_DLLS:${TARGET}>
+      COMMAND_EXPAND_LISTS)
+  endif()
 endif()
 
 include(CTest)

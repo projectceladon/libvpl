@@ -38,7 +38,6 @@ mfx_cc_defaults {
         "-Wall",
         "-fexceptions",
         "-Wno-unused-variable",
-        "-Wunused-parameter",
         "-Wmissing-field-initializers",
         "-DLIBVA_SUPPORT",
         "-DLIBVA_ANDROID_SUPPORT",

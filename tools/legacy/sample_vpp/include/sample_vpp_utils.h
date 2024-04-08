@@ -9,9 +9,11 @@
 
 /* ************************************************************************* */
 
-    #if defined(_WIN32) || defined(_WIN64)
-        #define D3D_SURFACES_SUPPORT
-    #endif // #if defined(_WIN32) || defined(_WIN64)
+    #ifndef D3D_SURFACES_SUPPORT
+        #if defined(_WIN32) || defined(_WIN64)
+            #define D3D_SURFACES_SUPPORT
+        #endif // #if defined(_WIN32) || defined(_WIN64)
+    #endif // #ifndef D3D_SURFACES_SUPPORT
 
     #ifdef D3D_SURFACES_SUPPORT
         #pragma warning(disable : 4201)
@@ -129,6 +131,8 @@ typedef struct _filtersParam {
     sVideoSignalInfoParam* pVideoSignalInfo;
     sMirroringParam* pMirroringParam;
     sColorFillParam* pColorfillParam;
+    sVideoSignalInfo* pVideoSignalInfoIn;
+    sVideoSignalInfo* pVideoSignalInfoOut;
 } sFiltersParam;
 
 struct sInputParams {
@@ -172,18 +176,16 @@ struct sInputParams {
     std::string strDevicePath; // path to device for processing
     #endif
 
-    #ifdef ONEVPL_EXPERIMENTAL
-        #if defined(_WIN32)
+    #if defined(_WIN32)
     LUID luid;
-        #else
+    #else
     mfxU32 DRMRenderNodeNum;
-        #endif
+    #endif
     mfxU32 PCIDomain;
     mfxU32 PCIBus;
     mfxU32 PCIDevice;
     mfxU32 PCIFunction;
     bool PCIDeviceSetup;
-    #endif
 
     mfxU16 adapterType;
     mfxI32 dGfxIdx;
@@ -266,6 +268,12 @@ struct sInputParams {
     std::unique_ptr<mfxU16[]> RGB[3];
     bool bIs3dLutVideoMem;
 
+    std::vector<sVideoSignalInfo> videoSignalInfoIn;
+    std::vector<sVideoSignalInfo> videoSignalInfoOut;
+
+    std::string m_vpp_cfg;
+    std::string dump_file;
+
     sInputParams()
             : frameInfoIn(),
               frameInfoOut(),
@@ -292,18 +300,16 @@ struct sInputParams {
     #if defined(LINUX32) || defined(LINUX64)
               strDevicePath(),
     #endif
-    #ifdef ONEVPL_EXPERIMENTAL
-        #if defined(_WIN32)
+    #if defined(_WIN32)
               luid({ 0 }),
-        #else
+    #else
               DRMRenderNodeNum(0),
-        #endif
+    #endif
               PCIDomain(0),
               PCIBus(0),
               PCIDevice(0),
               PCIFunction(0),
               PCIDeviceSetup(false),
-    #endif
               adapterType(mfxMediaAdapterType::MFX_MEDIA_UNKNOWN),
               dGfxIdx(-1),
               adapterNum(-1),
@@ -351,7 +357,11 @@ struct sInputParams {
               b3dLut(false),
               lutSize(0),
               lutTbl(),
-              bIs3dLutVideoMem(false) {
+              bIs3dLutVideoMem(false),
+              videoSignalInfoIn(),
+              videoSignalInfoOut(),
+              m_vpp_cfg(),
+              dump_file() {
         MSDK_ZERO_MEMORY(strSrcFile);
         MSDK_ZERO_MEMORY(strPerfFile);
         MSDK_ZERO_MEMORY(inFrameInfo);

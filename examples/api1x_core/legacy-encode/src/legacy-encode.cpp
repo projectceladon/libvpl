@@ -5,10 +5,9 @@
 //==============================================================================
 
 ///
-/// A minimal oneAPI Video Processing Library (oneVPL) encode application
+/// A minimal Intel® Video Processing Library (Intel® VPL) encode application
 /// using the core API subset.  For more information see:
-/// https://software.intel.com/content/www/us/en/develop/articles/upgrading-from-msdk-to-onevpl.html
-/// https://oneapi-src.github.io/oneAPI-spec/elements/oneVPL/source/index.html
+/// https://intel.github.io/libvpl
 /// @file
 
 #include "util.hpp"
@@ -66,7 +65,7 @@ int main(int argc, char *argv[]) {
     sink = fopen(OUTPUT_FILE, "wb");
     VERIFY(sink, "Could not create output file");
 
-    // Initialize oneVPL session
+    // Initialize session
     loader = MFXLoad();
     VERIFY(NULL != loader, "MFXLoad failed -- is implementation in path?");
 
@@ -107,8 +106,14 @@ int main(int argc, char *argv[]) {
 
     encodeParams.IOPattern = MFX_IOPATTERN_IN_SYSTEM_MEMORY;
 
-    //fill in missing params
+    // Validate video encode parameters
+    // - In this example the validation result is written to same structure
+    // - MFX_WRN_INCOMPATIBLE_VIDEO_PARAM is returned if some of the video parameters are not supported,
+    //   instead the encoder will select suitable parameters closest matching the requested configuration,
+    //   and it's ignorable.
     sts = MFXVideoENCODE_Query(session, &encodeParams, &encodeParams);
+    if (sts == MFX_WRN_INCOMPATIBLE_VIDEO_PARAM)
+        sts = MFX_ERR_NONE;
     VERIFY(MFX_ERR_NONE == sts, "Encode query failed");
 
     // Initialize encoder
@@ -159,11 +164,15 @@ int main(int argc, char *argv[]) {
                 // MFX_ERR_NONE and syncp indicate output is available
                 if (syncp) {
                     // Encode output is not available on CPU until sync operation completes
-                    sts = MFXVideoCORE_SyncOperation(session, syncp, WAIT_100_MILLISECONDS);
-                    VERIFY(MFX_ERR_NONE == sts, "MFXVideoCORE_SyncOperation error");
+                    do {
+                        sts = MFXVideoCORE_SyncOperation(session, syncp, WAIT_100_MILLISECONDS);
+                        if (MFX_ERR_NONE == sts) {
+                            WriteEncodedStream(bitstream, sink);
+                            framenum++;
+                        }
+                    } while (sts == MFX_WRN_IN_EXECUTION);
 
-                    WriteEncodedStream(bitstream, sink);
-                    framenum++;
+                    VERIFY(MFX_ERR_NONE == sts, "MFXVideoCORE_SyncOperation error");
                 }
                 break;
             case MFX_ERR_NOT_ENOUGH_BUFFER:

@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 //==============================================================================
+// Example using Intel® Video Processing Library (Intel® VPL)
 
 ///
 /// Utility library header file for sample code
@@ -41,7 +42,7 @@ enum {
 
 #ifdef LIBVA_SUPPORT
     #include "va/va.h"
-    #include "va//drm/va_drm.h"
+    #include "va/drm/va_drm.h"
 #endif
 
 #define WAIT_100_MILLISECONDS 100
@@ -222,7 +223,7 @@ void FreeAcceleratorHandle(void *accelHandle, int fd) {
 #endif
 }
 
-// Shows implementation info with oneVPL
+// Shows implementation info with Intel® Video Processing Library (Intel® VPL)
 void ShowImplementationInfo(mfxLoader loader, mfxU32 implnum) {
     mfxImplDescription *idesc = nullptr;
     mfxStatus sts;
@@ -231,7 +232,7 @@ void ShowImplementationInfo(mfxLoader loader, mfxU32 implnum) {
     if (!idesc || (sts != MFX_ERR_NONE))
         return;
 
-    printf("\noneVPL Implementation details:\n");
+    printf("\nIntel® VPL Implementation details:\n");
     printf("    ApiVersion:           %hu.%hu  \n",
            idesc->ApiVersion.Major,
            idesc->ApiVersion.Minor);

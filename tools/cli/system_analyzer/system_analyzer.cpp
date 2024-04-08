@@ -20,9 +20,10 @@
     #include <unistd.h>
     #include "dlfcn.h"
     #include "va/va.h"
-    #include "va//drm/va_drm.h"
+    #include "va/drm/va_drm.h"
 #endif
 
+// Intel® Video Processing Library (Intel® VPL)
 typedef struct gpuinfo {
     unsigned int deviceid;
     std::array<char, 128> name;
@@ -33,8 +34,8 @@ typedef struct gpuinfo {
 gpuinfo get_gpuinfo(unsigned int deviceid) {
     gpuinfo result;
     gpuinfo gpunames[] = {
-        { 0x56C0, { "Intel® Data Center GPU Flex 170" }, { "Xe HPG" }, { "ATS-M150" } },
-        { 0x56C1, { "Intel® Data Center GPU Flex 140" }, { "Xe HPG" }, { "ATS-M75" } },
+        { 0x56C0, { "Intel® Data Center GPU Flex Series 170" }, { "Xe HPG" }, { "ATS-M150" } },
+        { 0x56C1, { "Intel® Data Center GPU Flex Series 140" }, { "Xe HPG" }, { "ATS-M75" } },
         { 0x5694, { "Intel® Arc(TM) A350M graphics" }, { "Xe HPG" }, { "DG2" } },
         { 0x5693, { "Intel® Arc(TM) A370M graphics" }, { "Xe HPG" }, { "DG2" } },
         { 0x5692, { "Intel® Arc(TM) A550M graphics" }, { "Xe HPG" }, { "DG2" } },
@@ -157,7 +158,6 @@ bool show_MFXLoad_info() {
             printf("    SubDeviceID: %s\n", dev->SubDevices[subdevice].SubDeviceID);
         }
 
-#ifdef ONEVPL_EXPERIMENTAL
         mfxExtendedDeviceId *idescDevice;
 
         mfxStatus sts = MFXEnumImplementations(loader,
@@ -199,7 +199,6 @@ bool show_MFXLoad_info() {
             printf("DeviceName: %s\n", idescDevice->DeviceName);
             MFXDispReleaseImplDescription(loader, idescDevice);
         }
-#endif
 
         i++;
     }
@@ -259,7 +258,7 @@ int main() {
     printf("------------------------------------\n");
     printf("Available implementation details:\n");
     if (!show_MFXLoad_info()) {
-        printf("No oneVPL implementations found.  Is environment configured?\n");
+        printf("No Intel® VPL implementations found.  Is environment configured?\n");
     }
     printf("------------------------------------\n");
 

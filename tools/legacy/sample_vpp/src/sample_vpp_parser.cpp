@@ -24,6 +24,8 @@
     #error MFX_VERSION not defined
 #endif
 
+// Intel® Video Processing Library (Intel® VPL)
+
 void vppPrintHelp(const char* strAppName, const char* strErrorMessage) {
     printf("Intel(R) Media SDK VPP Sample version %s\n", GetMSDKSampleVersion().c_str());
     if (strErrorMessage) {
@@ -41,14 +43,12 @@ void vppPrintHelp(const char* strAppName, const char* strErrorMessage) {
     printf(
         "                                  If not specified, defaults to the first Intel device found on the system\n\n");
 #endif
-#ifdef ONEVPL_EXPERIMENTAL
-    #if (defined(_WIN64) || defined(_WIN32))
+#if (defined(_WIN64) || defined(_WIN32))
     printf("   [-luid HighPart:LowPart] - setup adapter by LUID  \n");
     printf("                                 For example: \"0x0:0x8a46\"  \n");
-    #endif
+#endif
     printf("   [-pci domain:bus:device.function] - setup device with PCI \n");
     printf("                                 For example: \"0:3:0.0\"  \n");
-#endif
     printf(
         "   [-dGfx]                     - prefer processing on dGfx (by default system decides)\n");
     printf(
@@ -56,9 +56,9 @@ void vppPrintHelp(const char* strAppName, const char* strErrorMessage) {
     printf(
         "   [-AdapterNum]               - specifies adapter number for processing, starts from 0\n");
     printf(
-        "   [-dispatcher:fullSearch]    - enable search for all available implementations in oneVPL dispatcher\n");
+        "   [-dispatcher:fullSearch]    - enable search for all available implementations in Intel® VPL dispatcher\n");
     printf(
-        "   [-dispatcher:lowLatency]    - enable limited implementation search and query in oneVPL dispatcher\n");
+        "   [-dispatcher:lowLatency]    - enable limited implementation search and query in Intel® VPL dispatcher\n");
 #if defined(D3D_SURFACES_SUPPORT)
     printf("   [-d3d]                      - use d3d9 surfaces\n\n");
 #endif
@@ -339,9 +339,29 @@ void vppPrintHelp(const char* strAppName, const char* strErrorMessage) {
     printf("   [-rbf] - read frame-by-frame from the input (sw lib only)\n\n");
 
     printf("   [-3dlut] path to 3dlut table file\n");
-    printf("   [-3dlutMemType] specify 3dLut memory type, 0: video, 1: sys. Default value is 0\n");
-    printf("   [-3dlutMemType] specify 3dlut mode for HDR 3Dlut, allowwed values:17|33|65\n");
+    printf("   [-3dlutMemType] specify 3dlut memory type, 0: video, 1: sys. Default value is 0\n");
+    printf("   [-3dlutMode] specify 3dlut mode for HDR 3Dlut, allowwed values:17|33|65\n");
 
+    printf(
+        "   [-SignalInfoIn fullrange colorprimary transfer_characteristic]    - set input video signal info\n");
+    printf("             fullrange - 1 is full, 0 is limited\n");
+    printf(
+        "             colorprimary - BT709 value 1, BT2020 value 9, refer to video spec(e.g. HEVC Table E.3) for more\n");
+    printf(
+        "             transfer_characteristic - BT709 value 1, ST2084 value 16, refer to video spec(e.g. HEVC Table E.4) for more\n");
+    printf(
+        "   [-SignalInfoOut fullrange colorprimary transfer_characteristic]   - set output video signal info\n");
+    printf("             fullrange - 1 is full, 0 is limited\n");
+    printf(
+        "             colorprimary - BT709 value 1, BT2020 value 9, refer to video spec(e.g. HEVC Table E.3) for more\n");
+    printf(
+        "             transfer_characteristic - BT709 value 1, ST2084 value 16, refer to video spec(e.g. HEVC Table E.4) for more\n");
+
+#ifdef ONEVPL_EXPERIMENTAL
+    printf("   [-cfg::vpp config]    - Set VPP options via string-api\n");
+#endif
+    printf(
+        "   [-dump fileName]         - dump MSDK components configuration to the file in text form\n");
     printf("\n");
 
     printf(
@@ -615,7 +635,6 @@ mfxStatus vppParseResetPar(char* strInput[],
     pParams->colorfillParam.push_back(*pDefaultFiltersParam->pColorfillParam);
 
     mfxU32 readData;
-    mfxU32 ioStatus;
 
     for (mfxU32& i = curArg; i < nArgNum; i++) {
         MSDK_CHECK_POINTER(strInput[i], MFX_ERR_NULL_PTR);
@@ -696,14 +715,18 @@ mfxStatus vppParseResetPar(char* strInput[],
                 pParams->denoiseParam[paramID].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->denoiseParam[paramID].factor = (mfxU16)readData;
                         pParams->denoiseParam[paramID].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
                     }
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->denoiseParam[paramID].config = (mfxU16)readData;
                         pParams->denoiseParam[paramID].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -720,8 +743,10 @@ mfxStatus vppParseResetPar(char* strInput[],
                 pParams->deinterlaceParam[paramID].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->deinterlaceParam[paramID].algorithm = (mfxU16)readData;
                         pParams->deinterlaceParam[paramID].mode = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -730,8 +755,10 @@ mfxStatus vppParseResetPar(char* strInput[],
             }
             else if (msdk_match(strInput[i], "-tc_pattern")) {
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->deinterlaceParam[paramID].tc_pattern = (mfxU16)readData;
                         i++;
                     }
@@ -741,8 +768,10 @@ mfxStatus vppParseResetPar(char* strInput[],
                 //pParams->deinterlaceParam.mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->deinterlaceParam[paramID].tc_pos = (mfxU16)readData;
                         i++;
                     }
@@ -752,8 +781,10 @@ mfxStatus vppParseResetPar(char* strInput[],
                 pParams->detailParam[paramID].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->detailParam[paramID].factor = (mfxU16)readData;
                         pParams->detailParam[paramID].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -869,8 +900,10 @@ mfxStatus vppParseResetPar(char* strInput[],
                 pParams->istabParam[paramID].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->istabParam[paramID].istabMode = (mfxU8)readData;
                         pParams->istabParam[paramID].mode      = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -892,8 +925,10 @@ mfxStatus vppParseResetPar(char* strInput[],
                 pParams->steParam[paramID].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->steParam[paramID].SkinToneFactor = (mfxU8)readData;
                         pParams->steParam[paramID].mode           = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -936,6 +971,32 @@ mfxStatus vppParseResetPar(char* strInput[],
             else if (msdk_match(strInput[i], "-cf_disable")) {
                 pParams->colorfillParam[paramID].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                 pParams->colorfillParam[paramID].Enable = MFX_CODINGOPTION_OFF;
+            }
+            else if (msdk_match(strInput[i], "-SignalInfoIn")) {
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoIn[paramID].VideoFullRange);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoIn[paramID].ColourPrimaries);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i],
+                              pParams->videoSignalInfoIn[paramID].TransferCharacteristics);
+                pParams->videoSignalInfoIn[paramID].mode = VPP_FILTER_ENABLED_CONFIGURED;
+            }
+            else if (msdk_match(strInput[i], "-SignalInfoOut")) {
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoOut[paramID].VideoFullRange);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoOut[paramID].ColourPrimaries);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i],
+                              pParams->videoSignalInfoOut[paramID].TransferCharacteristics);
+                pParams->videoSignalInfoOut[paramID].mode = VPP_FILTER_ENABLED_CONFIGURED;
             }
             else {
                 printf("Unknow reset option: %s\n", strInput[i]);
@@ -991,7 +1052,6 @@ mfxStatus vppParseInputString(char* strInput[],
     MSDK_CHECK_POINTER(strInput, MFX_ERR_NULL_PTR);
 
     mfxU32 readData;
-    mfxU32 ioStatus;
     if (nArgNum < 4) {
         vppPrintHelp(strInput[0], "Not enough parameters");
 
@@ -1143,14 +1203,18 @@ mfxStatus vppParseInputString(char* strInput[],
                 pParams->denoiseParam[0].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->denoiseParam[0].factor = (mfxU16)readData;
                         pParams->denoiseParam[0].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
                     }
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->denoiseParam[0].config = (mfxU16)readData;
                         pParams->denoiseParam[0].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -1179,8 +1243,10 @@ mfxStatus vppParseInputString(char* strInput[],
                 pParams->deinterlaceParam[0].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->deinterlaceParam[0].algorithm = (mfxU16)readData;
                         pParams->deinterlaceParam[0].mode      = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -1189,8 +1255,10 @@ mfxStatus vppParseInputString(char* strInput[],
             }
             else if (msdk_match(strInput[i], "-tc_pattern")) {
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->deinterlaceParam[0].tc_pattern = (mfxU16)readData;
                         i++;
                     }
@@ -1200,8 +1268,10 @@ mfxStatus vppParseInputString(char* strInput[],
                 //pParams->deinterlaceParam.mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->deinterlaceParam[0].tc_pos = (mfxU16)readData;
                         i++;
                     }
@@ -1211,8 +1281,10 @@ mfxStatus vppParseInputString(char* strInput[],
                 pParams->detailParam[0].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->detailParam[0].factor = (mfxU16)readData;
                         pParams->detailParam[0].mode   = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -1272,6 +1344,30 @@ mfxStatus vppParseInputString(char* strInput[],
                     return MFX_ERR_UNSUPPORTED;
                 }
                 i++;
+            }
+            else if (msdk_match(strInput[i], "-SignalInfoIn")) {
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoIn[0].VideoFullRange);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoIn[0].ColourPrimaries);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoIn[0].TransferCharacteristics);
+                pParams->videoSignalInfoIn[0].mode = VPP_FILTER_ENABLED_CONFIGURED;
+            }
+            else if (msdk_match(strInput[i], "-SignalInfoOut")) {
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoOut[0].VideoFullRange);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoOut[0].ColourPrimaries);
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                msdk_opt_read(strInput[i], pParams->videoSignalInfoOut[0].TransferCharacteristics);
+                pParams->videoSignalInfoOut[0].mode = VPP_FILTER_ENABLED_CONFIGURED;
             }
             else if (msdk_match(strInput[i], "-composite")) {
                 if (i + 1 < nArgNum) {
@@ -1390,8 +1486,10 @@ mfxStatus vppParseInputString(char* strInput[],
                 pParams->istabParam[0].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->istabParam[0].istabMode = (mfxU8)readData;
                         pParams->istabParam[0].mode      = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -1413,8 +1511,10 @@ mfxStatus vppParseInputString(char* strInput[],
                 pParams->steParam[0].mode = VPP_FILTER_ENABLED_DEFAULT;
 
                 if (i + 1 < nArgNum) {
-                    ioStatus = msdk_opt_read(strInput[i + 1], readData);
-                    if (ioStatus > 0) {
+                    if (MFX_ERR_NONE != msdk_opt_read(strInput[i + 1], readData)) {
+                        return MFX_ERR_UNSUPPORTED;
+                    }
+                    else {
                         pParams->steParam[0].SkinToneFactor = (mfxU8)readData;
                         pParams->steParam[0].mode           = VPP_FILTER_ENABLED_CONFIGURED;
                         i++;
@@ -1608,17 +1708,14 @@ mfxStatus vppParseInputString(char* strInput[],
                 }
                 VAL_CHECK(i + 1 == nArgNum);
                 pParams->strDevicePath = strInput[++i];
-    #ifdef ONEVPL_EXPERIMENTAL
-                size_t pos = pParams->strDevicePath.find("renderD");
+                size_t pos             = pParams->strDevicePath.find("renderD");
                 if (pos != std::string::npos) {
                     pParams->DRMRenderNodeNum =
                         std::stoi(pParams->strDevicePath.substr(pos + 7, 3));
                 }
-    #endif
             }
 #endif
-#ifdef ONEVPL_EXPERIMENTAL
-    #if defined(_WIN32)
+#if defined(_WIN32)
             else if (msdk_match(strInput[i], "-luid")) {
                 // <HighPart:LowPart>
                 char luid[MSDK_MAX_FILENAME_LEN];
@@ -1647,7 +1744,7 @@ mfxStatus vppParseInputString(char* strInput[],
                     return MFX_ERR_UNSUPPORTED;
                 }
             }
-    #endif
+#endif
             else if (msdk_match(strInput[i], "-pci")) {
                 char deviceInfo[MSDK_MAX_FILENAME_LEN];
                 if (i + 1 >= nArgNum) {
@@ -1680,7 +1777,6 @@ mfxStatus vppParseInputString(char* strInput[],
                     return MFX_ERR_UNSUPPORTED;
                 }
             }
-#endif
             else if (msdk_match(strInput[i], "-dGfx")) {
                 pParams->adapterType = mfxMediaAdapterType::MFX_MEDIA_DISCRETE;
                 if (i + 1 < nArgNum && isdigit(*strInput[1 + i])) {
@@ -1797,6 +1893,18 @@ mfxStatus vppParseInputString(char* strInput[],
             }
             else if (msdk_match(strInput[i], "-rbf")) {
                 pParams->bReadByFrame = true;
+            }
+#ifdef ONEVPL_EXPERIMENTAL
+            else if (msdk_match(strInput[i], "-cfg::vpp")) {
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                pParams->m_vpp_cfg = strInput[i];
+            }
+#endif
+            else if (msdk_match(strInput[i], "-dump")) {
+                VAL_CHECK(1 + i == nArgNum);
+                i++;
+                pParams->dump_file = strInput[i];
             }
             else {
                 printf("Unknown option: %s\n", strInput[i]);

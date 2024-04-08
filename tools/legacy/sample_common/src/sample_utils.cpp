@@ -1150,6 +1150,9 @@ mfxStatus GetChromaSize(const mfxFrameInfo& pInfo, mfxU32& ChromaW, mfxU32& Chro
     return MFX_ERR_NONE;
 }
 
+// Size of temp buffer for shifting operation
+#define SHIFT_OP_BUFF_SIZE 8192 * 4
+
 mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
     MSDK_CHECK_ERROR(m_bInited, false, MFX_ERR_NOT_INITIALIZED);
     MSDK_CHECK_POINTER(pSurface, MFX_ERR_NULL_PTR);
@@ -1163,7 +1166,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
     mfxU32 shiftSizeLuma   = 16 - pInfo.BitDepthLuma;
     mfxU32 shiftSizeChroma = 16 - pInfo.BitDepthChroma;
     // Temporary buffer to convert MS to no-MS format
-    std::vector<mfxU16> tmp;
+    std::vector<mfxU16> tmp(SHIFT_OP_BUFF_SIZE);
 
     if (!m_bIsMultiView) {
         MSDK_CHECK_POINTER(m_fDest, MFX_ERR_NULL_PTR);
@@ -1203,8 +1206,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
                                  i * pData.Pitch;
                 if (pInfo.Shift) {
                     // Bits will be shifted to the lower position
-                    tmp.resize(pInfo.CropW * 2);
-
                     for (int idx = 0; idx < pInfo.CropW * 2; idx++) {
                         tmp[idx] = ((mfxU16*)pBuffer)[idx] >> shiftSizeLuma;
                     }
@@ -1237,15 +1238,13 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             }
             return MFX_ERR_NONE;
         } break;
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_Y416: // Luma and chroma will be filled below
         {
             for (i = 0; i < pInfo.CropH; i++) {
                 mfxU8* pBuffer = ((mfxU8*)pData.U) + (pInfo.CropY * pData.Pitch + pInfo.CropX * 8) +
                                  i * pData.Pitch;
                 if (pInfo.Shift) {
-                    tmp.resize(pInfo.CropW * 4);
-
+                    // Bits will be shifted to the lower position
                     for (int idx = 0; idx < pInfo.CropW * 4; idx++) {
                         tmp[idx] = ((mfxU16*)pBuffer)[idx] >> shiftSizeLuma;
                     }
@@ -1263,7 +1262,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             }
             return MFX_ERR_NONE;
         } break;
-#endif
         case MFX_FOURCC_I010:
         case MFX_FOURCC_I210:
             for (i = 0; i < pInfo.CropH; i++) {
@@ -1275,9 +1273,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             }
             break;
         case MFX_FOURCC_P010:
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_P016:
-#endif
         case MFX_FOURCC_P210: {
             for (i = 0; i < pInfo.CropH; i++) {
                 mfxU16* shortPtr = (mfxU16*)(pData.Y + (pInfo.CropY * pData.Pitch + pInfo.CropX) +
@@ -1285,8 +1281,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
                 if (pInfo.Shift) {
                     // Convert MS-P*1* to P*1* and write
                     // Bits will be shifted to the lower position
-                    tmp.resize(pData.Pitch);
-
                     for (int idx = 0; idx < pInfo.CropW; idx++) {
                         tmp[idx] = shortPtr[idx] >> shiftSizeLuma;
                     }
@@ -1408,9 +1402,7 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
             break;
         }
         case MFX_FOURCC_P010:
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_P016:
-#endif
         case MFX_FOURCC_P210: {
             for (i = 0; i < ChromaH; i++) {
                 mfxU16* shortPtr =
@@ -1419,8 +1411,6 @@ mfxStatus CSmplYUVWriter::WriteNextFrame(mfxFrameSurface1* pSurface) {
                 if (pInfo.Shift) {
                     // Convert MS-P*1* to P*1* and write
                     // Bits will be shifted to the lower position
-                    tmp.resize(pData.Pitch);
-
                     for (mfxU32 idx = 0; idx < ChromaW; idx++) {
                         tmp[idx] = shortPtr[idx] >> shiftSizeChroma;
                     }
@@ -2020,6 +2010,8 @@ const char* ColorFormatToStr(mfxU32 format) {
             return "I422";
         case MFX_FOURCC_RGB4:
             return "RGB4";
+        case MFX_FOURCC_BGR4:
+            return "BGR4";
         case MFX_FOURCC_YUY2:
             return "YUY2";
         case MFX_FOURCC_UYVY:
@@ -2548,6 +2540,12 @@ mfxStatus StrFormatToCodecFormatFourCC(char* strInput, mfxU32& codecFormat) {
         else if ((msdk_match(strInput, "p010"))) {
             codecFormat = MFX_CODEC_P010;
         }
+        else if ((msdk_match(strInput, "yuy2"))) {
+            codecFormat = MFX_CODEC_YUY2;
+        }
+        else if ((msdk_match(strInput, "y210"))) {
+            codecFormat = MFX_CODEC_Y210;
+        }
         else
             sts = MFX_ERR_UNSUPPORTED;
     }
@@ -2835,6 +2833,7 @@ mfxU16 FourCCToChroma(mfxU32 fourCC) {
         case MFX_FOURCC_A2RGB10:
         case MFX_FOURCC_AYUV:
         case MFX_FOURCC_RGB4:
+        case MFX_FOURCC_BGR4:
             return MFX_CHROMAFORMAT_YUV444;
     }
 
@@ -2907,3 +2906,74 @@ int PrintLibMFXPath(struct dl_phdr_info* info, size_t size, void* data) {
 }
 
 #endif // #if defined(_WIN32) || defined(_WIN64)
+
+#ifdef ONEVPL_EXPERIMENTAL
+
+mfxStatus SetParameter(mfxConfigInterface* config_interface,
+                       MfxVideoParamsWrapper& par,
+                       const std::string& param) {
+    if (param.empty()) {
+        return MFX_ERR_NONE;
+    }
+    mfxStatus sts;
+    mfxExtBuffer ext_buf;
+    std::string param_delim("=");
+    size_t delim_pos = param.find(param_delim);
+    if (delim_pos == std::string::npos) {
+        return MFX_ERR_INVALID_VIDEO_PARAM;
+    }
+    std::string name  = param.substr(0, delim_pos);
+    std::string value = param.substr(delim_pos + param_delim.length());
+    // printf("Set param: %s = %s\n", name.c_str(), value.c_str());
+    sts = config_interface->SetParameter(config_interface,
+                                         (const mfxU8*)name.c_str(),
+                                         (const mfxU8*)value.c_str(),
+                                         MFX_STRUCTURE_TYPE_VIDEO_PARAM,
+                                         &par,
+                                         &ext_buf);
+    if (sts == MFX_ERR_MORE_EXTBUFFER) {
+        // printf("Adding Ext Buffer: %x\n", ext_buf.BufferId);
+        par.AddExtBuffer(ext_buf.BufferId, ext_buf.BufferSz);
+        // printf("Set Ext Buffer: %s = %s\n", name.c_str(), value.c_str());
+        sts = config_interface->SetParameter(config_interface,
+                                             (const mfxU8*)name.c_str(),
+                                             (const mfxU8*)value.c_str(),
+                                             MFX_STRUCTURE_TYPE_VIDEO_PARAM,
+                                             &par,
+                                             &ext_buf);
+    }
+    return sts;
+}
+
+mfxStatus SetParameters(mfxSession session, MfxVideoParamsWrapper& par, const std::string& params) {
+    mfxConfigInterface* config_interface = nullptr;
+    mfxStatus sts;
+    std::string params_str(params.begin(), params.end());
+    std::string params_delim(":");
+    sts = MFXGetConfigInterface(session, &config_interface);
+    if (sts != MFX_ERR_NONE) {
+        // printf("!! %d\n", sts);
+        return sts;
+    }
+
+    size_t pos       = 0;
+    size_t delim_pos = params_str.find(params_delim, pos);
+    // SetParameter treats an empty string as a valid no-op so we don't have to detect it here.
+    while (delim_pos != std::string::npos) {
+        size_t delim = delim_pos - pos;
+        // std::cout << pos << ", " << delim_pos << " : " << params_str.substr(pos, delim)
+        //           << std::endl;
+        sts = SetParameter(config_interface, par, params_str.substr(pos, delim));
+        if (sts != MFX_ERR_NONE) {
+            return sts;
+        }
+        pos       = pos + delim + params_delim.length();
+        delim_pos = params_str.find(params_delim, pos);
+    }
+    if (pos < params_str.length()) {
+        sts = SetParameter(config_interface, par, params_str.substr(pos));
+    }
+    return sts;
+}
+
+#endif // ONEVPL_EXPERIMENTAL

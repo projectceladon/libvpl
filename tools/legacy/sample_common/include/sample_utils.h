@@ -76,6 +76,8 @@ enum {
 #define MFX_CODEC_I420 MFX_FOURCC_I420
 #define MFX_CODEC_I422 MFX_FOURCC_I422
 #define MFX_CODEC_P010 MFX_FOURCC_P010
+#define MFX_CODEC_YUY2 MFX_FOURCC_YUY2
+#define MFX_CODEC_Y210 MFX_FOURCC_Y210
 
 enum {
     MFX_FOURCC_IMC3    = MFX_MAKEFOURCC('I', 'M', 'C', '3'),
@@ -482,6 +484,10 @@ template <>
 struct mfx_ext_buffer_id<mfxExtVPPPercEncPrefilter> {
     enum { id = MFX_EXTBUFF_VPP_PERC_ENC_PREFILTER };
 };
+template <>
+struct mfx_ext_buffer_id<mfxExtTuneEncodeQuality> {
+    enum { id = MFX_EXTBUFF_TUNE_ENCODE_QUALITY };
+};
 #endif
 
 constexpr uint16_t max_num_ext_buffers =
@@ -594,6 +600,10 @@ public:
 
     ExtBufHolder(ExtBufHolder&&)            = default;
     ExtBufHolder& operator=(ExtBufHolder&&) = default;
+
+    mfxExtBuffer* AddExtBuffer(mfxU32 id, mfxU32 size) {
+        return AddExtBuffer(id, size, false);
+    }
 
     // Always returns a valid pointer or throws an exception
     template <typename TB>
@@ -1576,5 +1586,7 @@ private:
     std::map<mfxU32, mfxU32> m_FirstFrameInBuffer{}; //key is target ID
     std::map<mfxU32, mfxU32> m_LastFrameInBuffer{}; //key is target ID
 };
+
+mfxStatus SetParameters(mfxSession session, MfxVideoParamsWrapper& par, const std::string& params);
 
 #endif //__SAMPLE_UTILS_H__

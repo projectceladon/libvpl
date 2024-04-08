@@ -533,13 +533,11 @@ mfxStatus CEncodingPipeline::InitMfxEncParams(sInputParams* pInParams) {
             hevcTiles->NumTileRows    = pInParams->nEncTileRows;
             hevcTiles->NumTileColumns = pInParams->nEncTileCols;
         }
-#if MFX_VERSION >= MFX_VERSION_NEXT
         else if (m_mfxEncParams.mfx.CodecId == MFX_CODEC_VP9) {
             auto vp9Param            = m_mfxEncParams.AddExtBuffer<mfxExtVP9Param>();
             vp9Param->NumTileRows    = pInParams->nEncTileRows;
             vp9Param->NumTileColumns = pInParams->nEncTileCols;
         }
-#endif
         else if (m_mfxEncParams.mfx.CodecId == MFX_CODEC_AV1) {
             auto av1Tilepar            = m_mfxEncParams.AddExtBuffer<mfxExtAV1TileParam>();
             av1Tilepar->NumTileRows    = pInParams->nEncTileRows;
@@ -794,6 +792,11 @@ mfxStatus CEncodingPipeline::InitMfxEncParams(sInputParams* pInParams) {
     }
 #endif
 
+#ifdef ONEVPL_EXPERIMENTAL
+    mfxStatus sts =
+        SetParameters((mfxSession)(m_mfxSession), m_mfxEncParams, pInParams->m_encode_cfg);
+    MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
     return MFX_ERR_NONE;
 }
 
@@ -934,7 +937,10 @@ mfxStatus CEncodingPipeline::InitMfxVppParams(sInputParams* pInParams) {
     InitVppFilters();
 
     m_mfxVppParams.AsyncDepth = pInParams->nAsyncDepth;
-
+#ifdef ONEVPL_EXPERIMENTAL
+    mfxStatus sts = SetParameters((mfxSession)(m_mfxSession), m_mfxVppParams, pInParams->m_vpp_cfg);
+    MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
     return MFX_ERR_NONE;
 }
 
@@ -958,6 +964,9 @@ mfxStatus CEncodingPipeline::CreateHWDevice() {
     MSDK_CHECK_STATUS(sts, "m_hwdev->Init failed");
 
 #elif LIBVA_SUPPORT
+    if (m_strDevicePath.empty() && m_verSessionInit == API_2X) {
+        m_strDevicePath = "/dev/dri/renderD" + std::to_string(m_pLoader->GetDRMRenderNodeNumUsed());
+    }
 
     m_hwdev = CreateVAAPIDevice(m_strDevicePath);
 
@@ -1694,19 +1703,17 @@ mfxStatus CEncodingPipeline::Init(sInputParams* pParams) {
         if (pParams->adapterNum >= 0)
             m_pLoader->SetAdapterNum(pParams->adapterNum);
 
-#ifdef ONEVPL_EXPERIMENTAL
         if (pParams->PCIDeviceSetup)
             m_pLoader->SetPCIDevice(pParams->PCIDomain,
                                     pParams->PCIBus,
                                     pParams->PCIDevice,
                                     pParams->PCIFunction);
 
-    #if (defined(_WIN64) || defined(_WIN32))
+#if (defined(_WIN64) || defined(_WIN32))
         if (pParams->luid.HighPart > 0 || pParams->luid.LowPart > 0)
             m_pLoader->SetupLUID(pParams->luid);
-    #else
+#else
         m_pLoader->SetupDRMRenderNodeNum(pParams->DRMRenderNodeNum);
-    #endif
 #endif
 
         if (!pParams->accelerationMode && pParams->bUseHWLib) {
@@ -1870,8 +1877,8 @@ mfxStatus CEncodingPipeline::Init(sInputParams* pParams) {
     m_bCutOutput = pParams->dstFileBuff.size() ? !pParams->bUncut : false;
 
     // Dumping components configuration if required
-    if (*pParams->DumpFileName) {
-        CParametersDumper::DumpLibraryConfiguration(pParams->DumpFileName,
+    if (!pParams->dump_file.empty()) {
+        CParametersDumper::DumpLibraryConfiguration(pParams->dump_file,
                                                     NULL,
                                                     m_pmfxVPP,
                                                     m_pmfxENC,

@@ -14,7 +14,7 @@
 
     #if defined(LIBVA_DRM_SUPPORT)
         #include <intel_bufmgr.h>
-        #include <va/va_drm.h>
+        #include <va/drm/va_drm.h>
         #include <xf86drm.h>
         #include <xf86drmMode.h>
     #endif
@@ -185,6 +185,10 @@ public:
                                                    uint64_t modifier[4],
                                                    uint32_t* buf_id,
                                                    uint32_t flags);
+        #if defined(DRM_LINUX_FORMAT_MODIFIER_BLOB_SUPPORT)
+    typedef bool (*drmModeFormatModifierBlobIterNext_type)(const drmModePropertyBlobRes* blob,
+                                                           drmModeFormatModifierIterator* iter);
+        #endif
     typedef void (*drmModeFreeConnector_type)(drmModeConnectorPtr ptr);
     typedef void (*drmModeFreeCrtc_type)(drmModeCrtcPtr ptr);
     typedef void (*drmModeFreeEncoder_type)(drmModeEncoderPtr ptr);
@@ -221,7 +225,6 @@ public:
                                         uint32_t src_y,
                                         uint32_t src_w,
                                         uint32_t src_h);
-
     DRM_Proxy();
     ~DRM_Proxy();
 
@@ -229,6 +232,9 @@ public:
     __DECLARE(drmIoctl);
     __DECLARE(drmModeAddFB);
     __DECLARE(drmModeAddFB2WithModifiers);
+        #if defined(DRM_LINUX_FORMAT_MODIFIER_BLOB_SUPPORT)
+    __DECLARE(drmModeFormatModifierBlobIterNext);
+        #endif
     __DECLARE(drmSetClientCap);
     __DECLARE(drmModeObjectGetProperties);
     __DECLARE(drmModeFreeObjectProperties);

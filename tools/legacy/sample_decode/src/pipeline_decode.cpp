@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <ctime>
 #include <thread>
+#include "parameters_dumper.h"
 #include "pipeline_decode.h"
 #include "sysmem_allocator.h"
 
@@ -327,6 +328,7 @@ mfxStatus CDecodingPipeline::Init(sInputParams* pParams) {
         m_memType = pParams->memType;
     else {
         switch (pParams->mode) {
+            case MODE_FILE_DUMP:
             case MODE_PERFORMANCE:
 #if defined(_WIN32) || defined(_WIN64)
                 m_memType = pParams->bUseHWLib ? D3D11_MEMORY : SYSTEM_MEMORY;
@@ -335,10 +337,11 @@ mfxStatus CDecodingPipeline::Init(sInputParams* pParams) {
 #endif
                 break;
             case MODE_RENDERING:
-                m_memType = D3D9_MEMORY;
-                break;
-            case MODE_FILE_DUMP:
-                m_memType = SYSTEM_MEMORY;
+                m_memType =
+#if MFX_D3D11_SUPPORT
+                    D3D11_MEMORY;
+#endif
+                D3D9_MEMORY;
                 break;
             default:
                 assert(0);
@@ -431,19 +434,17 @@ mfxStatus CDecodingPipeline::Init(sInputParams* pParams) {
         if (pParams->adapterNum >= 0)
             m_pLoader->SetAdapterNum(pParams->adapterNum);
 
-#ifdef ONEVPL_EXPERIMENTAL
         if (pParams->PCIDeviceSetup)
             m_pLoader->SetPCIDevice(pParams->PCIDomain,
                                     pParams->PCIBus,
                                     pParams->PCIDevice,
                                     pParams->PCIFunction);
 
-    #if (defined(_WIN64) || defined(_WIN32))
+#if (defined(_WIN64) || defined(_WIN32))
         if (pParams->luid.HighPart > 0 || pParams->luid.LowPart)
             m_pLoader->SetupLUID(pParams->luid);
-    #else
+#else
         m_pLoader->SetupDRMRenderNodeNum(pParams->DRMRenderNodeNum);
-    #endif
 #endif
 
         if (!pParams->accelerationMode && pParams->bUseHWLib) {
@@ -594,7 +595,10 @@ mfxStatus CDecodingPipeline::Init(sInputParams* pParams) {
             auto par         = m_mfxVppVideoParams.AddExtBuffer<mfxExtVPPScaling>();
             par->ScalingMode = pParams->ScalingMode;
         }
-
+#ifdef ONEVPL_EXPERIMENTAL
+        sts = SetParameters((mfxSession)(m_mfxSession), m_mfxVppVideoParams, pParams->m_vpp_cfg);
+        MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
         sts = m_pmfxVPP->Init(&m_mfxVppVideoParams);
         if (MFX_WRN_PARTIAL_ACCELERATION == sts) {
             printf("WARNING: partial acceleration\n");
@@ -609,6 +613,17 @@ mfxStatus CDecodingPipeline::Init(sInputParams* pParams) {
     if (m_eWorkMode == MODE_RENDERING) {
         sts = CreateRenderingWindow(pParams);
         MSDK_CHECK_STATUS(sts, "CreateRenderingWindow failed");
+    }
+
+    // Dumping components configuration if required
+    if (!pParams->dump_file.empty()) {
+        CParametersDumper::DumpLibraryConfiguration(pParams->dump_file,
+                                                    m_pmfxDEC,
+                                                    m_pmfxVPP,
+                                                    NULL,
+                                                    &m_mfxVideoParams,
+                                                    &m_mfxVppVideoParams,
+                                                    NULL);
     }
 
     return sts;
@@ -1012,7 +1027,10 @@ mfxStatus CDecodingPipeline::InitMfxParams(sInputParams* pParams) {
     if (m_mfxVideoParams.mfx.CodecId == MFX_CODEC_AV1)
         m_mfxVideoParams.mfx.FilmGrain =
             pParams->bDisableFilmGrain ? 0 : m_mfxVideoParams.mfx.FilmGrain;
-
+#ifdef ONEVPL_EXPERIMENTAL
+    sts = SetParameters((mfxSession)(m_mfxSession), m_mfxVideoParams, pParams->m_decode_cfg);
+    MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
     return MFX_ERR_NONE;
 }
 
@@ -1135,6 +1153,10 @@ mfxStatus CDecodingPipeline::CreateHWDevice() {
 #elif defined(LIBVA_DRM_SUPPORT) || defined(LIBVA_X11_SUPPORT) || \
     defined(LIBVA_ANDROID_SUPPORT) || defined(LIBVA_WAYLAND_SUPPORT)
     mfxStatus sts = MFX_ERR_NONE;
+
+    if (m_strDevicePath.empty() && m_verSessionInit == API_2X) {
+        m_strDevicePath = "/dev/dri/renderD" + std::to_string(m_pLoader->GetDRMRenderNodeNumUsed());
+    }
 
     m_hwdev = CreateVAAPIDevice(m_strDevicePath, m_libvaBackend);
 
@@ -1558,7 +1580,10 @@ mfxStatus CDecodingPipeline::ResetDecoder(sInputParams* pParams) {
             auto par         = m_mfxVppVideoParams.AddExtBuffer<mfxExtVPPScaling>();
             par->ScalingMode = pParams->ScalingMode;
         }
-
+#ifdef ONEVPL_EXPERIMENTAL
+        sts = SetParameters((mfxSession)(m_mfxSession), m_mfxVppVideoParams, pParams->m_vpp_cfg);
+        MSDK_CHECK_STATUS(sts, "SetParameters failed");
+#endif
         sts = m_pmfxVPP->Init(&m_mfxVppVideoParams);
         if (MFX_WRN_PARTIAL_ACCELERATION == sts) {
             printf("WARNING: partial acceleration\n");
@@ -2124,9 +2149,16 @@ void CDecodingPipeline::PrintStreamInfo() {
                m_bOutI420 ? "I420(YUV)" : CodecIdToStr(m_mfxVppVideoParams.vpp.Out.FourCC).c_str());
     }
     else {
-        printf(
-            "Output format\t%s\n",
-            m_bOutI420 ? "I420(YUV)" : CodecIdToStr(m_mfxVideoParams.mfx.FrameInfo.FourCC).c_str());
+        mfxU32 fourcc = m_mfxVideoParams.mfx.FrameInfo.FourCC;
+
+        if (m_mfxVideoParams.mfx.CodecId == MFX_CODEC_AVC ||
+            m_mfxVideoParams.mfx.CodecId == MFX_CODEC_HEVC) {
+            auto decPostProcessing = m_mfxVideoParams.GetExtBuffer<mfxExtDecVideoProcessing>();
+            if (decPostProcessing)
+                fourcc = decPostProcessing->Out.FourCC;
+        }
+
+        printf("Output format\t%s\n", m_bOutI420 ? "I420(YUV)" : CodecIdToStr(fourcc).c_str());
     }
 
     mfxFrameInfo Info = m_mfxVideoParams.mfx.FrameInfo;

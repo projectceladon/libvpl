@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 # ##############################################################################
-# oneAPI Video Processing Library (oneVPL) main build script
+
 cmake_minimum_required(VERSION 3.13.0)
 if(MSVC)
   cmake_policy(SET CMP0091 NEW)
@@ -76,6 +76,32 @@ set(BUILD_TOOLS_ONEVPL_EXPERIMENTAL
 option(BUILD_DISPATCHER_ONLY "Build dispatcher only." OFF)
 option(BUILD_DEV_ONLY "Build only developer package." OFF)
 
+# Test tool options for surface sharing
+if(WIN32)
+  set(TOOLS_DEFAULT_SCREEN_CAPTURE ON)
+  set(TOOLS_DEFAULT_RENDER ON)
+  set(TOOLS_DEFAULT_OPENCL ON)
+  set(TOOLS_DEFAULT_X11 OFF)
+else()
+  set(TOOLS_DEFAULT_SCREEN_CAPTURE ON)
+  set(TOOLS_DEFAULT_RENDER ON)
+  set(TOOLS_DEFAULT_OPENCL OFF)
+  set(TOOLS_DEFAULT_X11 ON)
+endif()
+
+option(TOOLS_ENABLE_SCREEN_CAPTURE
+       "Enable screen capture in surface sharing test tools."
+       ${TOOLS_DEFAULT_SCREEN_CAPTURE})
+
+option(TOOLS_ENABLE_RENDER "Enable rendering in surface sharing test tools."
+       ${TOOLS_DEFAULT_RENDER})
+
+option(TOOLS_ENABLE_OPENCL "Enable OpenCL in surface sharing test tools."
+       ${TOOLS_DEFAULT_OPENCL})
+
+option(TOOLS_ENABLE_X11 "Enable X11 in surface sharing test tools."
+       ${TOOLS_DEFAULT_X11})
+
 if(BUILD_DISPATCHER_ONLY)
   set(BUILD_DEV OFF)
   set(BUILD_PREVIEW OFF)
@@ -103,6 +129,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 
 include(cmake/InstallDirs.cmake)
+include(cmake/PackageTarget.cmake)
 
 # Set POSITION_INDEPENDENT_CODE property for all targets
 set(CMAKE_POSITION_INDEPENDENT_CODE true)
@@ -113,34 +140,32 @@ set(CMAKE_INSTALL_SO_NO_EXE 0)
 include(cmake/CompileOptions.cmake)
 
 if(BUILD_TESTS)
-  include(Dart)
+  include(CTest)
   enable_testing()
 endif()
 
 add_subdirectory(api)
-add_subdirectory(dispatcher)
+add_subdirectory(libvpl)
 if(BUILD_TOOLS)
   add_subdirectory(tools)
 endif()
 if(BUILD_DEV)
   add_subdirectory(env)
-  add_subdirectory(modulefiles)
   add_subdirectory(examples)
 endif()
 
 install(
   FILES third-party-programs.txt
   DESTINATION ${VPL_INSTALL_LICENSEDIR}
-  COMPONENT license)
+  COMPONENT ${VPL_COMPONENT_LIB})
 
 install(
   FILES LICENSE
   RENAME license.txt
   DESTINATION ${VPL_INSTALL_LICENSEDIR}
-  COMPONENT license)
+  COMPONENT ${VPL_COMPONENT_LIB})
 
-include(cmake/PackageTarget.cmake)
-set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT runtime)
+set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT ${VPL_COMPONENT_LIB})
 include(InstallRequiredSystemLibraries)
 
 message(
@@ -233,4 +258,15 @@ if(MSVC)
   message(
     STATUS "  USE_MSVC_STATIC_RUNTIME              : ${USE_MSVC_STATIC_RUNTIME}"
   )
+
 endif()
+
+message(STATUS "Surface sharing test tools:")
+message(
+  STATUS
+    "  TOOLS_ENABLE_SCREEN_CAPTURE          : ${TOOLS_ENABLE_SCREEN_CAPTURE}")
+message(
+  STATUS "  TOOLS_ENABLE_RENDER                  : ${TOOLS_ENABLE_RENDER}")
+message(
+  STATUS "  TOOLS_ENABLE_OPENCL                  : ${TOOLS_ENABLE_OPENCL}")
+message(STATUS "  TOOLS_ENABLE_X11                     : ${TOOLS_ENABLE_X11}")

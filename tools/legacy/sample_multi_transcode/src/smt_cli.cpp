@@ -3,12 +3,11 @@
   #
   # SPDX-License-Identifier: MIT
   ############################################################################*/
-
+// CLI of tool for Intel® Video Processing Library (Intel® VPL)
 #include <regex>
 #include "mfx_samples_config.h"
 #include "plugin_utils.h"
 #include "sample_defs.h"
-#include "mfxdeprecated.h"
 
 #if defined(_WIN32) || defined(_WIN64)
     #include <d3d9.h>
@@ -218,18 +217,16 @@ void PrintHelp() {
     HELP_LINE("  -dual_gfx::<on,off,adaptive>");
     HELP_LINE("                prefer encode processing on both iGfx and dGfx simultaneously");
 #endif
-#ifdef ONEVPL_EXPERIMENTAL
-    #if (defined(_WIN64) || defined(_WIN32))
+#if (defined(_WIN64) || defined(_WIN32))
     HELP_LINE("");
     HELP_LINE("  -luid <HighPart:LowPart>");
     HELP_LINE("                setup adapter by LUID");
     HELP_LINE("                For example: \"0x0:0x8a46\"");
-    #endif
+#endif
     HELP_LINE("");
     HELP_LINE("  -pci <domain:bus:device.function>");
     HELP_LINE("                setup device with PCI");
     HELP_LINE("                For example: \"0:3:0.0\"");
-#endif
     HELP_LINE("");
     HELP_LINE("  -dGfx         prefer processing on dGfx (by default system decides),");
     HELP_LINE("                also can be set with index,");
@@ -241,11 +238,11 @@ void PrintHelp() {
     HELP_LINE("");
     HELP_LINE("  -dispatcher:fullSearch");
     HELP_LINE("                enable search for all available implementations in");
-    HELP_LINE("                oneVPL dispatcher");
+    HELP_LINE("                Intel® VPL dispatcher");
     HELP_LINE("");
     HELP_LINE("  -dispatcher:lowLatency");
     HELP_LINE("                enable limited implementation search and query in");
-    HELP_LINE("                oneVPL dispatcher");
+    HELP_LINE("                Intel® VPL dispatcher");
     HELP_LINE("");
     HELP_LINE("  -mfe_frames <N>");
     HELP_LINE("                maximum number of frames to be combined in multi-frame");
@@ -327,6 +324,11 @@ void PrintHelp() {
     HELP_LINE("                number of frames acquired from decoder.");
     HELP_LINE("                In encoding sessions (-o::source) and transcoding sessions");
     HELP_LINE("                this parameter limits number of frames sent to encoder.");
+    HELP_LINE("");
+    HELP_LINE("  -exactNframe <0|1>");
+    HELP_LINE("                0 - default");
+    HELP_LINE("                1 - Generate exact number of encode frame during transcode,");
+    HELP_LINE("                    use together with -n option");
     HELP_LINE("");
     HELP_LINE("  -MemType::video");
     HELP_LINE("                Force usage of external video allocator (default)");
@@ -511,6 +513,9 @@ void PrintHelp() {
     HELP_LINE("  -AdaptiveB:<on|off>");
     HELP_LINE("                Turn Adaptive B frames on/off");
     HELP_LINE("");
+    HELP_LINE("  -AdaptiveCQM:<on|off>");
+    HELP_LINE("                Turn Adaptive CQM on/off");
+    HELP_LINE("");
     HELP_LINE("  -InitialDelayInKB");
     HELP_LINE("                The decoder starts decoding after the buffer reaches the");
     HELP_LINE("                initial size InitialDelayInKB, which is equivalent to reaching");
@@ -544,6 +549,8 @@ void PrintHelp() {
     HELP_LINE("");
     HELP_LINE("  -DisableQPOffset");
     HELP_LINE("                Disable QP adjustment for GOP pyramid-level frames");
+    HELP_LINE("  -QPOffset \"Level1Offset Level2Offset ... Level8Offset\"");
+    HELP_LINE("                QP adjustment offset for GOP pyramid-level [1-8]");
     HELP_LINE("");
     HELP_LINE("  -MinQPI <QP>  min QP for I frames. In range [1,51]. 0 by default i.e. no limits");
     HELP_LINE("");
@@ -780,6 +787,9 @@ void PrintHelp() {
     HELP_LINE("                Disabling rendering after VPP Composition.");
     HELP_LINE("                This is for performance measurements");
     HELP_LINE("");
+    HELP_LINE("  -prolong 1");
+    HELP_LINE("                Prolonged the short video with black frame.");
+    HELP_LINE("");
     HELP_LINE("  -dec_postproc Resize after decoder using direct pipe");
     HELP_LINE("                (should be used in decoder session)");
     HELP_LINE("");
@@ -850,7 +860,31 @@ void PrintHelp() {
     HELP_LINE("");
     HELP_LINE("  -perc_enc_filter            ");
     HELP_LINE("                Enable perceptual encoding prefilter in VPP");
+    HELP_LINE("");
+    HELP_LINE("  -tune_enc <value>");
+    HELP_LINE("                Tune encoding quality using specific metric");
+    HELP_LINE("                See mfxExtTuneEncodeQuality::TuneQuality for supported <value>");
 #endif
+    HELP_LINE("  -ContentInfo <value>");
+    HELP_LINE("  -ScenarioInfo <value>");
+    HELP_LINE("                Tune encoding quality for specific content and usage scenario");
+    HELP_LINE(
+        "                See mfxExtCodingOption3::ContentInfo/ScenarioInfo for supported <value>.");
+    HELP_LINE("");
+#ifdef ONEVPL_EXPERIMENTAL
+    HELP_LINE("  -cfg::enc <config string>   Set encoder options via string-api\n");
+    HELP_LINE("  -cfg::dec <config string>   Set decoder options via string-api\n");
+    HELP_LINE("  -cfg::vpp <config string>   Set VPP options via string-api\n");
+    HELP_LINE("\n");
+#endif
+    HELP_LINE("Config string forat:\n");
+    HELP_LINE("  name=value(:name=value)*\n");
+    HELP_LINE("  name=value:name2=value2:name3=value3\n");
+    HELP_LINE("\n");
+    HELP_LINE("  valid names and values are defined and checked at\n");
+    HELP_LINE("  runtime by the dispatcher and selected runtime library\n");
+    HELP_LINE("\n");
+
     HELP_LINE("");
     HELP_LINE("ParFile format:");
     HELP_LINE("  ParFile is extension of what can be achieved by setting pipeline in the command");
@@ -902,6 +936,7 @@ CmdProcessor::CmdProcessor()
           statisticsLogFile(nullptr),
           DumpLogFileName(),
           m_nTimeout(0),
+          m_surface_wait_interval(MSDK_SURFACE_WAIT_INTERVAL),
           bRobustFlag(false),
           bSoftRobustFlag(false),
           shouldUseGreedyFormula(false),
@@ -935,6 +970,17 @@ mfxStatus CmdProcessor::ParseCmdLine(int argc, char* argv[]) {
                 printf("error: no argument given for '-par' option\n");
             }
             parameter_file_name = std::string(argv[0]);
+        }
+        else if (msdk_match(argv[0], "-surface_wait_interval")) {
+            --argc;
+            ++argv;
+            if (!argv[0]) {
+                printf("error: no argument given for '-surface_wait_interval'\n");
+            }
+            if (MFX_ERR_NONE != msdk_opt_read(argv[0], m_surface_wait_interval)) {
+                printf("error: -surface_wait_interval \"%s\" is invalid", argv[0]);
+                return MFX_ERR_UNSUPPORTED;
+            }
         }
         else if (msdk_match(argv[0], "-timeout")) {
             --argc;
@@ -1102,59 +1148,129 @@ size_t CmdProcessor::GetStringLength(char* pTempLine, size_t length) {
 
     return i + 1;
 }
+#ifdef LOCAL_PARSER
 
-mfxStatus CmdProcessor::TokenizeLine(const std::string& line) {
-    return TokenizeLine(line.c_str(), line.size());
+// It would be preferable to use local OS command line parsing as
+// implemented here. However for backward compatibility a hand coded
+// parser is provided below.
+
+    #ifdef WIN32
+static void split_cmd(std::string const& cmd, std::vector<std::string>& args) {
+    std::wstring wcmd(cmd.begin(), cmd.end());
+    LPWSTR* arg_list;
+    int argc = 0;
+    int i;
+    arg_list = CommandLineToArgvW(wcmd.c_str(), &argc);
+    if (!arg_list) {
+        return;
+    }
+    for (i = 0; i < argc; i++) {
+        std::wstring arg(arg_list[i]);
+        args.push_back(std::string(arg.begin(), arg.end()));
+    }
+    LocalFree(arg_list);
+    return;
 }
 
-mfxStatus CmdProcessor::TokenizeLine(const char* pLine, size_t length) {
-    size_t i, strArgLen;
-    const mfxU8 maxArgNum = 255;
-    char* argv[maxArgNum + 1];
-    mfxU32 argc   = 0;
-    auto pMemLine = std::make_unique<char[]>(length + 2);
+    #else
+        #include <wordexp.h>
 
-    char* pTempLine = pMemLine.get();
-    pTempLine[0]    = ' ';
-    pTempLine++;
-
-    MSDK_MEMCPY_BUF(pTempLine, 0, length * sizeof(char), pLine, length * sizeof(char));
-
-    // parse into command streams
-    for (i = 0; i < length; i++) {
-        // check if separator
-        if (IS_SEPARATOR(pTempLine[-1]) && !IS_SEPARATOR(pTempLine[0])) {
-            argv[argc++] = pTempLine;
-            if (argc > maxArgNum) {
-                PrintError("Too many parameters (reached maximum of %d)", maxArgNum);
-                return MFX_ERR_UNSUPPORTED;
-            }
-        }
-
-        if (*pTempLine == '\"') {
-            strArgLen = GetStringLength(pTempLine, length - i);
-            if (!strArgLen) {
-                PrintError("Error parsing string literal");
-                return MFX_ERR_UNSUPPORTED;
-            }
-
-            // remove leading and trailing ", bump pointer ahead to next argument
-            pTempLine[0]             = ' ';
-            pTempLine[strArgLen - 1] = ' ';
-            pTempLine += strArgLen;
-            i += strArgLen;
-        }
-
-        if (*pTempLine == ' ' || *pTempLine == '\r' || *pTempLine == '\n') {
-            *pTempLine = 0;
-        }
-        pTempLine++;
+static void split_cmd(std::string const& cmd, std::vector<std::string>& args) {
+    if (cmd.empty()) {
+        return;
     }
+    wordexp_t w_exp;
+    if (0 != wordexp(cmd, &w_exp, WRDE_NOCMD)) {
+        return;
+    }
+    for (size_t i = 0; i < w_exp.we_wordc) {
+        args.append(w_exp.we_wordv[i])
+    }
+    return;
+}
 
-    // EOL for last parameter
-    pTempLine[0] = 0;
+    #endif
+#else
 
-    return ParseParamsForOneSession(argc, argv);
+/*
+Split a string like a command line.
+
+This function uses the algorithm used by CommandLineToArgvW, but runs on
+ASCII/UTF-8 input, and treats '=' as whitespace for word breaking purposes.
+
+The last is to maintain backward compatibility with the prior behavior of TokenizeLine.
+*/
+
+static void split_cmd(std::string const& cmd, std::vector<std::string>& args) {
+    if (cmd.empty()) {
+        return;
+    }
+    size_t i           = 0;
+    bool found_arg     = false;
+    bool in_quotes     = false;
+    size_t slash_count = 0;
+    bool use_char      = true;
+    std::stringstream arg;
+    while (i < cmd.size()) {
+        // remove leading whitespace
+        while ((i < cmd.size()) && (cmd[i] == ' ' || cmd[i] == '\t' || cmd[i] == '=')) {
+            i += 1;
+        }
+        if (i >= cmd.size()) {
+            break;
+        }
+        found_arg = false;
+        while (i < cmd.size()) {
+            slash_count = 0;
+            use_char    = true;
+            while ((i < cmd.size()) && cmd[i] == '\\') {
+                i += 1;
+                slash_count += 1;
+            }
+            if (cmd[i] == '"') {
+                found_arg = true;
+                if (slash_count % 2 == 0) {
+                    if (in_quotes && cmd[i + 1] == '"') {
+                        in_quotes = !in_quotes;
+                        i += 1;
+                    }
+                    else {
+                        use_char  = false;
+                        in_quotes = !in_quotes;
+                    }
+                }
+                slash_count /= 2;
+            }
+            while (slash_count--) {
+                arg << '\\';
+                found_arg = true;
+            }
+            if (!in_quotes && (cmd[i] == ' ' || cmd[i] == '\t' || cmd[i] == '=')) {
+                break;
+            }
+            if (use_char) {
+                arg << cmd[i];
+                found_arg = true;
+            }
+            i += 1;
+        }
+        if (found_arg) {
+            args.push_back(arg.str());
+        }
+        arg.str(std::string());
+    }
+}
+
+#endif
+
+mfxStatus CmdProcessor::TokenizeLine(const std::string& line) {
+    std::vector<std::string> args;
+    split_cmd(line, args);
+    std::vector<char*> argv;
+    for (auto& arg : args) {
+        argv.push_back(&arg[0]);
+    }
+    return ParseParamsForOneSession((mfxU32)argv.size(), &argv[0]);
 }
 
 bool CmdProcessor::isspace(char a) {
@@ -1495,6 +1611,12 @@ mfxStatus ParseAdditionalParams(char* argv[],
     }
     else if (msdk_match(argv[i], "-AdaptiveB:off")) {
         InputParams.AdaptiveB = MFX_CODINGOPTION_OFF;
+    }
+    else if (msdk_match(argv[i], "-AdaptiveCQM:on")) {
+        InputParams.AdaptiveCQM = MFX_CODINGOPTION_ON;
+    }
+    else if (msdk_match(argv[i], "-AdaptiveCQM:off")) {
+        InputParams.AdaptiveCQM = MFX_CODINGOPTION_OFF;
     }
     else if (msdk_match(argv[i], "-iGfx")) {
         InputParams.adapterType = mfxMediaAdapterType::MFX_MEDIA_INTEGRATED;
@@ -1861,7 +1983,6 @@ mfxStatus ParseAdditionalParams(char* argv[],
             return MFX_ERR_UNSUPPORTED;
         }
     }
-#ifdef ONEVPL_EXPERIMENTAL
     else if (msdk_match(argv[i], "-pci")) {
         std::string deviceInfo;
         VAL_CHECK(i + 1 == argc, i, argv[i]);
@@ -1890,7 +2011,7 @@ mfxStatus ParseAdditionalParams(char* argv[],
             return MFX_ERR_UNSUPPORTED;
         }
     }
-    #if defined(_WIN32)
+#if defined(_WIN32)
     else if (msdk_match(argv[i], "-LUID")) {
         // <HighPart:LowPart>
         std::string luid;
@@ -1915,7 +2036,6 @@ mfxStatus ParseAdditionalParams(char* argv[],
             return MFX_ERR_UNSUPPORTED;
         }
     }
-    #endif
 #endif
     else if (msdk_match(argv[i], "-ivf:on")) {
         InputParams.nIVFHeader = MFX_CODINGOPTION_ON;
@@ -1943,7 +2063,86 @@ mfxStatus ParseAdditionalParams(char* argv[],
     else if (msdk_match(argv[i], "-perc_enc_filter")) {
         InputParams.PercEncPrefilter = true;
     }
+    else if (msdk_match(argv[i], "-tune_enc")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        if (MFX_ERR_NONE != msdk_opt_read(argv[++i], InputParams.TuneEncodeQuality)) {
+            PrintError("-tune_enc is invalid");
+            return MFX_ERR_UNSUPPORTED;
+        }
+    }
 #endif
+    else if (msdk_match(argv[i], "-ScenarioInfo")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        if (MFX_ERR_NONE != msdk_opt_read(argv[++i], InputParams.ScenarioInfo)) {
+            PrintError("-ScenarioInfo option is invalid");
+            return MFX_ERR_UNSUPPORTED;
+        }
+    }
+    else if (msdk_match(argv[i], "-ContentInfo")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        if (MFX_ERR_NONE != msdk_opt_read(argv[++i], InputParams.ContentInfo)) {
+            PrintError("-ContentInfo option is invalid");
+            return MFX_ERR_UNSUPPORTED;
+        }
+    }
+#ifdef ONEVPL_EXPERIMENTAL
+    else if (msdk_match(argv[i], "-cfg::dec")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        i++;
+        InputParams.m_decode_cfg = argv[i];
+    }
+    else if (msdk_match(argv[i], "-cfg::enc")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        i++;
+        InputParams.m_encode_cfg = argv[i];
+    }
+    else if (msdk_match(argv[i], "-cfg::vpp")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        i++;
+        InputParams.m_vpp_cfg = argv[i];
+    }
+#endif
+    else if (msdk_match(argv[i], "-QPOffset")) {
+        InputParams.bSetQPOffset = true;
+        VAL_CHECK(i + 1 >= argc, i, argv[i]);
+        mfxU16 arr[8] = {};
+        int j;
+        size_t k;
+
+        std::vector<std::string> args;
+        k = split(argv[i + 1], args);
+        if (k != 8) {
+            PrintError("Invalid number of QP Offsets, %d", k);
+            return MFX_ERR_UNSUPPORTED;
+        }
+
+        for (int j = 0; j < 8; j++) {
+            try {
+                arr[j] = (mfxU16)std::stoul(args[j]);
+            }
+            catch (const std::invalid_argument&) {
+                printf("QP Offset setting invalid.\n");
+                return MFX_ERR_UNSUPPORTED;
+            }
+            catch (const std::out_of_range&) {
+                printf("QP Offset setting out of bounds.\n");
+                return MFX_ERR_UNSUPPORTED;
+            }
+        }
+
+        for (j = 0; j < 8; j++) {
+            InputParams.QPOffset[j] = arr[j];
+        }
+        i += 1;
+    }
+    else if (msdk_match(argv[i], "-exactNframe")) {
+        VAL_CHECK(i + 1 == argc, i, argv[i]);
+        i++;
+        if (MFX_ERR_NONE != msdk_opt_read(argv[i], InputParams.ExactNframe)) {
+            PrintError("-exactNframe %s is invalid", argv[i]);
+            return MFX_ERR_UNSUPPORTED;
+        }
+    }
     else {
         // no matching argument was found
         return MFX_ERR_NOT_FOUND;
@@ -2767,6 +2966,14 @@ mfxStatus CmdProcessor::ParseParamsForOneSession(mfxU32 argc, char* argv[]) {
                 return MFX_ERR_UNSUPPORTED;
             }
         }
+        else if (msdk_match(argv[i], "-prolong")) {
+            VAL_CHECK(i + 1 == argc, i, argv[i]);
+            i++;
+            if (MFX_ERR_NONE != msdk_opt_read(argv[i], InputParams.prolonged)) {
+                PrintError("-prolong %s is invalid", argv[i]);
+                return MFX_ERR_UNSUPPORTED;
+            }
+        }
         else if (msdk_match(argv[i], "-angle")) {
             VAL_CHECK(i + 1 == argc, i, argv[i]);
             i++;
@@ -2814,7 +3021,7 @@ mfxStatus CmdProcessor::ParseParamsForOneSession(mfxU32 argc, char* argv[]) {
         else if (msdk_match(argv[i], "-dump")) {
             VAL_CHECK(i + 1 == argc, i, argv[i]);
             i++;
-            if (MFX_ERR_NONE != msdk_opt_read(argv[i], InputParams.strMfxParamsDumpFile)) {
+            if (MFX_ERR_NONE != msdk_opt_read(argv[i], InputParams.dump_file)) {
                 PrintError("Dump file name \"%s\" is invalid", argv[i]);
                 return MFX_ERR_UNSUPPORTED;
             }
@@ -3134,13 +3341,15 @@ mfxStatus CmdProcessor::VerifyAndCorrectInputParams(TranscodingSample::sInputPar
         MFX_CODEC_VP8 != InputParams.DecodeId && MFX_CODEC_AV1 != InputParams.DecodeId &&
         MFX_CODEC_RGB4 != InputParams.DecodeId && MFX_CODEC_NV12 != InputParams.DecodeId &&
         MFX_CODEC_I420 != InputParams.DecodeId && MFX_CODEC_P010 != InputParams.DecodeId &&
+        MFX_CODEC_YUY2 != InputParams.DecodeId && MFX_CODEC_Y210 != InputParams.DecodeId &&
         InputParams.eMode != Source) {
         PrintError("Unknown decoder\n");
         return MFX_ERR_UNSUPPORTED;
     }
 
     if (MFX_CODEC_I420 == InputParams.DecodeId || MFX_CODEC_NV12 == InputParams.DecodeId ||
-        MFX_CODEC_P010 == InputParams.DecodeId) {
+        MFX_CODEC_P010 == InputParams.DecodeId || MFX_CODEC_YUY2 == InputParams.DecodeId ||
+        MFX_CODEC_Y210 == InputParams.DecodeId) {
         if (InputParams.nMemoryModel == VISIBLE_INT_ALLOC ||
             InputParams.nMemoryModel == HIDDEN_INT_ALLOC) {
             PrintError("raw input is not supported with memory model 2.0\n");

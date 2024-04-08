@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: MIT
 # ##############################################################################
-# oneAPI Video Processing Library (oneVPL) API build script
+
 cmake_minimum_required(VERSION 3.13.0)
 
 set(VPL_API_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -37,5 +37,5 @@ if(BUILD_DEV)
   install(
     DIRECTORY ${VPL_API_INCLUDE_DIR}/vpl
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-    COMPONENT dev)
+    COMPONENT ${VPL_COMPONENT_DEV})
 endif()

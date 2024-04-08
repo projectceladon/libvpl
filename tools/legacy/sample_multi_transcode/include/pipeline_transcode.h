@@ -31,17 +31,17 @@
 #include "brc_routines.h"
 #include "hw_device.h"
 #include "mfxdeprecated.h"
-#include "mfxjpeg.h"
-#include "mfxmvc.h"
 #include "mfxplugin.h"
-#include "mfxvp8.h"
 #include "plugin_utils.h"
 #include "preset_manager.h"
 #include "sample_defs.h"
 #include "smt_tracer.h"
 #include "vpl/mfxdispatcher.h"
+#include "vpl/mfxjpeg.h"
+#include "vpl/mfxmvc.h"
 #include "vpl/mfxvideo++.h"
 #include "vpl/mfxvideo.h"
+#include "vpl/mfxvp8.h"
 
 #define TIME_STATS 1 // Enable statistics processing
 #include "time_statistics.h"
@@ -64,6 +64,9 @@ const mfxF64 MCTF_LOSSLESS_BPP        = 0.0;
 #endif
 
 namespace TranscodingSample {
+
+enum ProlongStatus { NormalFrame = 0x5F, BlackFrame = 0xBF, AllBlack = 0xAB };
+
 enum VppCompDumpMode { NULL_RENDER_VPP_COMP = 1, DUMP_FILE_VPP_COMP = 2 };
 
 enum MemoryModel {
@@ -140,12 +143,13 @@ public:
 struct PreEncAuxBuffer {
     mfxEncodeCtrl encCtrl;
     mfxU16 Locked;
-    mfxENCInput* encInput;
-    mfxENCOutput* encOutput;
+    mfxENCInput encInput;
+    mfxENCOutput encOutput;
 };
 
 struct ExtendedSurface {
     mfxU32 TargetID;
+    mfxU8 FrameAttrib;
 
     mfxFrameSurface1* pSurface;
     PreEncAuxBuffer* pAuxCtrl;
@@ -291,7 +295,8 @@ class CTranscodingPipeline;
 class SafetySurfaceBuffer {
 public:
     //this is used only for sanity check
-    mfxU32 TargetID = 0;
+    mfxU32 TargetID       = 0;
+    ProlongStatus Prolong = NormalFrame;
 
     struct SurfaceDescriptor {
         SurfaceDescriptor() : ExtSurface(), Locked(false) {}
@@ -426,6 +431,10 @@ public:
     void SetAdapterNum(mfxU32 adapterNum = 0) {
         m_adapterNum = adapterNum;
     };
+    void SetSurfaceWaitInterval(mfxU32 surface_wait_interval = MSDK_SURFACE_WAIT_INTERVAL) {
+        m_surface_wait_interval =
+            surface_wait_interval > 0 ? surface_wait_interval : MSDK_SURFACE_WAIT_INTERVAL;
+    };
     void SetSyncOpTimeout(mfxU32 syncOpTimeout = MSDK_WAIT_INTERVAL) {
         m_nSyncOpTimeout = syncOpTimeout;
     };
@@ -438,6 +447,9 @@ public:
     };
     mfxI32 GetAdapterNum() const {
         return m_adapterNum;
+    };
+    mfxU32 GetSurfaceWaitInterval() const {
+        return m_surface_wait_interval;
     };
     mfxU32 GetSyncOpTimeout() const {
         return m_nSyncOpTimeout;
@@ -468,6 +480,7 @@ protected:
     virtual mfxStatus Encode();
     virtual mfxStatus Transcode();
     virtual mfxStatus DecodeOneFrame(ExtendedSurface* pExtSurface);
+    virtual mfxStatus CreateBlackFrame(ExtendedSurface* pExtSurface);
     virtual mfxStatus DecodeLastFrame(ExtendedSurface* pExtSurface);
     virtual mfxStatus VPPOneFrame(ExtendedSurface* pSurfaceIn,
                                   ExtendedSurface* pExtSurface,
@@ -525,6 +538,7 @@ protected:
     mfxStatus PutBS();
 
     mfxStatus DumpSurface2File(mfxFrameSurface1* pSurface);
+    mfxStatus ReplaceBlackSurface(mfxFrameSurface1* pSurface);
     mfxStatus Surface2BS(ExtendedSurface* pSurf, mfxBitstreamWrapper* pBS, mfxU32 fourCC);
     mfxStatus NV12toBS(mfxFrameSurface1* pSurface, mfxBitstreamWrapper* pBS);
     mfxStatus I420toBS(mfxFrameSurface1* pSurface, mfxBitstreamWrapper* pBS);
@@ -677,6 +691,9 @@ protected:
     mfxU32 m_MaxFramesForTranscode;
     mfxU32 m_MaxFramesForEncode;
 
+    mfxU16 m_ExactNframe;
+    mfxU16 m_Prolonged;
+
     // pointer to already extended bs processor
     FileBitstreamProcessor* m_pBSProcessor;
 
@@ -711,7 +728,7 @@ protected:
     std::string m_sGenericPluginPath;
     mfxU16 m_nRotationAngle;
 
-    std::string m_strMfxParamsDumpFile;
+    std::string dump_file;
 
     void FillMBQPBuffer(mfxExtMBQP& qpMap, mfxU16 pictStruct);
 
@@ -731,6 +748,8 @@ protected:
 
     CascadeScalerConfig m_ScalerConfig;
 
+    mfxU32 m_surface_wait_interval =
+        MSDK_SURFACE_WAIT_INTERVAL; // Surface wait when getting free surface from pool
     mfxU32 m_nSyncOpTimeout = MSDK_WAIT_INTERVAL; // SyncOperation timeout in msec
 
 #if (defined(_WIN32) || defined(_WIN64))

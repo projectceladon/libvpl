@@ -5,10 +5,10 @@
 //==============================================================================
 
 ///
-/// A minimal oneAPI Video Processing Library (oneVPL) decode application,
+/// A minimal Intel® Video Processing Library (Intel® VPL) decode application,
 /// using 2.2 or newer API with internal memory management.
 /// For more information see
-/// https://oneapi-src.github.io/oneAPI-spec/elements/oneVPL/source/
+/// https://intel.github.io/libvpl
 /// @file
 
 #include "util.hpp"
@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
     mfxVideoParam decodeParams      = {};
 
     // variables used only in 2.x version
-    mfxConfig cfg[4];
-    mfxVariant cfgVal[4];
+    mfxConfig cfg[3];
+    mfxVariant cfgVal[3];
     mfxLoader loader = NULL;
 
     // Parse command line args to cliParams
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
     sink = fopen(OUTPUT_FILE, "wb");
     VERIFY(sink, "Could not create output file");
 
-    // Initialize VPL session
+    // Initialize session
     loader = MFXLoad();
     VERIFY(NULL != loader, "MFXLoad failed -- is implementation in path?");
 
@@ -97,15 +97,6 @@ int main(int argc, char *argv[]) {
                                      (mfxU8 *)"mfxImplDescription.ApiVersion.Version",
                                      cfgVal[2]);
     VERIFY(MFX_ERR_NONE == sts, "MFXSetConfigFilterProperty failed for API version");
-
-    mfxU8* filter;
-    filter = (mfxU8*)"mfxExtendedDeviceId.DRMRenderNodeNum";
-    cfg[3] = MFXCreateConfig(loader);
-    cfgVal[3].Type = MFX_VARIANT_TYPE_U32;
-    cfgVal[3].Data.U32 = 128;
-    sts = MFXSetConfigFilterProperty(cfg[3], filter, cfgVal[3]);
-    if (MFX_ERR_NONE != sts)
-        printf("MFXSetConfigFilterProperty 3 error=%d\n", sts);
 
     sts = MFXCreateSession(loader, 0, &session);
     VERIFY(MFX_ERR_NONE == sts,

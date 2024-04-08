@@ -5,7 +5,7 @@
 //==============================================================================
 
 ///
-/// A minimal oneAPI Video Processing Library (oneVPL) VPP application,
+/// A minimal Intel® Video Processing Library (Intel® VPL) VPP application,
 /// using 2.x API with internal memory management
 ///
 /// @file
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
     sink = fopen(OUTPUT_FILE, "wb");
     VERIFY(sink, "Could not create output file");
 
-    // Initialize VPL session
+    // Initialize session
     loader = MFXLoad();
     VERIFY(NULL != loader, "MFXLoad failed -- is implementation in path?");
 

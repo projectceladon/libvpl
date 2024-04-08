@@ -48,14 +48,12 @@ unsigned int ConvertMfxFourccToVAFormat(mfxU32 fourcc) {
             return VA_FOURCC_Y210;
         case MFX_FOURCC_Y410:
             return VA_FOURCC_Y410;
-    #if (MFX_VERSION >= MFX_VERSION_NEXT)
         case MFX_FOURCC_P016:
             return VA_FOURCC_P016;
         case MFX_FOURCC_Y216:
             return VA_FOURCC_Y216;
         case MFX_FOURCC_Y416:
             return VA_FOURCC_Y416;
-    #endif
 
         default:
             assert(!"unsupported fourcc");
@@ -134,11 +132,8 @@ static mfxStatus GetVAFourcc(mfxU32 fourcc, unsigned int& va_fourcc) {
                        (VA_FOURCC_P010 != va_fourcc) && (VA_FOURCC_YUY2 != va_fourcc) &&
                        (VA_FOURCC_Y210 != va_fourcc) && (VA_FOURCC_Y410 != va_fourcc) &&
                        (VA_FOURCC_RGB565 != va_fourcc) && (VA_FOURCC_RGBP != va_fourcc) &&
-    #if (MFX_VERSION >= MFX_VERSION_NEXT)
                        (VA_FOURCC_P016 != va_fourcc) && (VA_FOURCC_Y216 != va_fourcc) &&
-                       (VA_FOURCC_Y416 != va_fourcc) &&
-    #endif
-                       (VA_FOURCC_AYUV != va_fourcc))) {
+                       (VA_FOURCC_Y416 != va_fourcc) && (VA_FOURCC_AYUV != va_fourcc))) {
         return MFX_ERR_MEMORY_ALLOC;
     }
 
@@ -221,7 +216,8 @@ mfxStatus vaapiFrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
     VAStatus va_res        = VA_STATUS_SUCCESS;
     unsigned int va_fourcc = 0;
     VASurfaceID* surfaces  = NULL;
-    VASurfaceAttrib attrib;
+    VASurfaceAttrib attrib[2];
+    unsigned int attrCnt   = 0;
     vaapiMemId *vaapi_mids = NULL, *vaapi_mid = NULL;
     mfxMemId* mids      = NULL;
     mfxU32 fourcc       = request->Info.FourCC;
@@ -249,21 +245,24 @@ mfxStatus vaapiFrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
         if (VA_FOURCC_P208 != va_fourcc) {
             unsigned int format;
 
-            attrib.type          = VASurfaceAttribPixelFormat;
-            attrib.flags         = VA_SURFACE_ATTRIB_SETTABLE;
-            attrib.value.type    = VAGenericValueTypeInteger;
-            attrib.value.value.i = va_fourcc;
-            format               = va_fourcc;
+            attrib[attrCnt].type          = VASurfaceAttribPixelFormat;
+            attrib[attrCnt].flags         = VA_SURFACE_ATTRIB_SETTABLE;
+            attrib[attrCnt].value.type    = VAGenericValueTypeInteger;
+            attrib[attrCnt].value.value.i = va_fourcc;
+            format                        = va_fourcc;
 
-            if (fourcc == MFX_FOURCC_VP8_NV12) {
-                // special configuration for NV12 surf allocation for VP8 hybrid encoder is required
-                attrib.type          = (VASurfaceAttribType)VASurfaceAttribUsageHint;
-                attrib.value.value.i = VA_SURFACE_ATTRIB_USAGE_HINT_ENCODER;
+            if ((fourcc == MFX_FOURCC_VP8_NV12) ||
+                ((MFX_MEMTYPE_FROM_ENCODE & request->Type) && (fourcc == MFX_FOURCC_BGR4))) {
+                /* special configuration for NV12 surf allocation for VP8 hybrid encoder is required
+                 * RGB32 for JPEG is required
+		 */
+                attrib[attrCnt].type            = (VASurfaceAttribType)VASurfaceAttribUsageHint;
+                attrib[attrCnt++].value.value.i = VA_SURFACE_ATTRIB_USAGE_HINT_ENCODER;
             }
             else if (fourcc == MFX_FOURCC_VP8_MBDATA) {
                 // special configuration for MB data surf allocation for VP8 hybrid encoder is required
-                attrib.value.value.i = VA_FOURCC_P208;
-                format               = VA_FOURCC_P208;
+                attrib[attrCnt].value.value.i = VA_FOURCC_P208;
+                format                        = VA_FOURCC_P208;
             }
             else if (va_fourcc == VA_FOURCC_NV12) {
                 format = VA_RT_FORMAT_YUV420;
@@ -287,8 +286,8 @@ mfxStatus vaapiFrameAllocator::AllocImpl(mfxFrameAllocRequest* request,
                                                request->Info.Height,
                                                surfaces,
                                                surfaces_num,
-                                               &attrib,
-                                               1);
+                                               &attrib[0],
+                                               attrCnt);
 
             mfx_res             = va_to_mfx_status(va_res);
             bCreateSrfSucceeded = (MFX_ERR_NONE == mfx_res);
@@ -584,9 +583,7 @@ mfxStatus vaapiFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
                         return MFX_ERR_LOCK_MEMORY;
                     break;
                 case VA_FOURCC_P010:
-    #if (MFX_VERSION >= MFX_VERSION_NEXT)
                 case VA_FOURCC_P016:
-    #endif
                     if (mfx_fourcc != vaapi_mid->m_image.format.fourcc)
                         return MFX_ERR_LOCK_MEMORY;
 
@@ -608,9 +605,7 @@ mfxStatus vaapiFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
                     }
                     break;
                 case VA_FOURCC_Y210:
-    #if (MFX_VERSION >= MFX_VERSION_NEXT)
                 case VA_FOURCC_Y216:
-    #endif
                     if (mfx_fourcc != vaapi_mid->m_image.format.fourcc)
                         return MFX_ERR_LOCK_MEMORY;
 
@@ -631,7 +626,6 @@ mfxStatus vaapiFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
                         ptr->A    = 0;
                     }
                     break;
-    #if (MFX_VERSION >= MFX_VERSION_NEXT)
                 case VA_FOURCC_Y416:
                     if (mfx_fourcc != vaapi_mid->m_image.format.fourcc)
                         return MFX_ERR_LOCK_MEMORY;
@@ -643,7 +637,6 @@ mfxStatus vaapiFrameAllocator::LockFrame(mfxMemId mid, mfxFrameData* ptr) {
                         ptr->A   = (mfxU8*)(ptr->V16 + 1);
                     }
                     break;
-    #endif
                 default:
                     return MFX_ERR_LOCK_MEMORY;
             }

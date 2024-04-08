@@ -60,7 +60,7 @@ enum drm_static_metadata_id { DRM_STATIC_METADATA_TYPE1 = 0 };
 
 #if defined(LIBVA_DRM_SUPPORT)
 
-    #include <va/va_drm.h>
+    #include <va/drm/va_drm.h>
     #include <va/va_drmcommon.h>
     #include "vaapi_allocator.h"
     #include "vaapi_utils.h"
@@ -110,9 +110,9 @@ private:
     bool getConnector(drmModeRes* resource, uint32_t connector_type);
     bool setupConnection(drmModeRes* resource, drmModeConnector* connector);
     bool getPlane();
+    bool getAllFormatsAndModifiers();
 
     bool getConnectorProperties(int fd, int connectorId);
-    bool getCRTCProperties(int fd, int crtcId);
 
     bool setMaster();
     void dropMaster();
@@ -125,7 +125,6 @@ private:
     const uint8_t* edidFindCeaExtensionBlock(const uint8_t* edid);
     uint32_t getConnectorPropertyId(const char* propNameToFind);
     uint32_t getConnectorPropertyValue(const char* propNameToFind);
-    uint32_t getCRTCPropertyId(const char* propNameToFind);
     int drmSetColorSpace(bool enableBT2020);
     int drmSendHdrMetaData(mfxExtMasteringDisplayColourVolume* displayColor,
                            mfxExtContentLightLevelInfo* contentLight,
@@ -152,6 +151,7 @@ private:
     #if defined(DRM_LINUX_HDR_SUPPORT)
     struct drmHdrMetaData m_hdrMetaData;
     #endif
+    bool m_bRequiredTiled4;
     mfxFrameSurface1* m_pCurrentRenderTargetSurface;
 
 private:

@@ -1,14 +1,22 @@
 # Contributing
 
-The oneAPI Video Processing Library (oneVPL) project welcomes community
+The Intel® Video Processing Library (Intel® VPL) project welcomes community
 contributions. You can:
 
-- Submit your changes directly as a [pull request](https://github.com/oneapi-src/oneVPL/pulls)
-- Log a bug or feature request with an [issue](https://github.com/oneapi-src/oneVPL/issues)
+- Submit your changes directly as a [pull request](https://github.com/intel/libvpl/pulls)
+- Log a bug or feature request with an [issue](https://github.com/intel/libvpl/issues)
 
 ## Pull Request Checklist
 
 Before submitting your pull requests, please do the following:
+
+- Make sure your Pull Request includes these three sections in the description
+
+  - **Issue** - link for the ticket from Jira/HSD/ETC or state the problem
+  - **Solution** - Overview of your approach to solving the problem
+  - **Test** - how you tested the change
+
+- Make sure you update CHANGELOG.md if the change is important.
 
 - Make sure your changes are consistent with the
   [philosophy for contribution](#philosophy-for-contribution).

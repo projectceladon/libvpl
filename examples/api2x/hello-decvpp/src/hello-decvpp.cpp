@@ -5,10 +5,9 @@
 //==============================================================================
 
 ///
-/// A minimal oneAPI Video Processing Library (oneVPL) decode and VPP application
-/// using oneVPL 2.2 API features including internal memory. For more information see:
-/// https://software.intel.com/content/www/us/en/develop/articles/upgrading-from-msdk-to-onevpl.html
-/// https://oneapi-src.github.io/oneAPI-spec/elements/oneVPL/source/index.html
+/// A minimal Intel® Video Processing Library (Intel® VPL) decode and VPP application
+/// using Intel® VPL 2.2 API features including internal memory. For more information see:
+/// https://intel.github.io/libvpl
 ///
 /// @file
 
@@ -18,7 +17,7 @@
 #define VPP1_OUTPUT_FILE           "vpp_640x480_out.raw"
 #define VPP2_OUTPUT_FILE           "vpp_128x96_out.raw"
 #define BITSTREAM_BUFFER_SIZE      2000000
-#define SYNC_TIMEOUT               60000
+#define SYNC_TIMEOUT               100
 #define MAJOR_API_VERSION_REQUIRED 2
 #define MINOR_API_VERSION_REQUIRED 2
 
@@ -86,7 +85,7 @@ int main(int argc, char *argv[]) {
     sinkVPP2 = fopen(VPP2_OUTPUT_FILE, "wb");
     VERIFY(sinkVPP2, "Could not create vpp2 output file");
 
-    // Initialize VPL session
+    // Initialize session
     loader = MFXLoad();
     VERIFY(NULL != loader, "MFXLoad failed -- is implementation in path?");
 
@@ -239,29 +238,37 @@ int main(int argc, char *argv[]) {
 
                 for (mfxU32 i = 0; i < outSurfaces->NumSurfaces; i++) {
                     aSurf = outSurfaces->Surfaces[i];
+                    do {
+                        sts = aSurf->FrameInterface->Synchronize(aSurf, SYNC_TIMEOUT);
+                        VERIFY(MFX_ERR_NONE == sts || MFX_WRN_IN_EXECUTION == sts,
+                               "ERROR - FrameInterface->Synchronizee failed");
+                        if (sts == MFX_ERR_NONE) {
+                            if (aSurf->Info.ChannelId == 0) { // decoder output
+                                sts = WriteRawFrame_InternalMem(aSurf, sinkDec);
+                                VERIFY(MFX_ERR_NONE == sts,
+                                       "ERROR - Could not write decode output");
+                            }
+                            else { // VPP filter output
+                                sts = WriteRawFrame_InternalMem(aSurf,
+                                                                (i == 1) ? sinkVPP1 : sinkVPP2);
+                                VERIFY(MFX_ERR_NONE == sts, "ERROR - Could not write vpp output");
+                            }
+                        }
+                        if (sts != MFX_WRN_IN_EXECUTION) {
+                            sts = aSurf->FrameInterface->Release(aSurf);
+                            VERIFY(MFX_ERR_NONE == sts, "Could not release output surface");
+                        }
 
-                    sts = aSurf->FrameInterface->Synchronize(aSurf, SYNC_TIMEOUT);
-                    VERIFY(MFX_ERR_NONE == sts, "ERROR - FrameInterface->Synchronizee failed");
-
-                    if (aSurf->Info.ChannelId == 0) { // decoder output
-                        sts = WriteRawFrame_InternalMem(aSurf, sinkDec);
-                        VERIFY(MFX_ERR_NONE == sts, "ERROR - Could not write decode output");
-                    }
-                    else { // VPP filter output
-                        sts = WriteRawFrame_InternalMem(aSurf, (i == 1) ? sinkVPP1 : sinkVPP2);
-                        VERIFY(MFX_ERR_NONE == sts, "ERROR - Could not write vpp output");
-                    }
-
-                    sts = aSurf->FrameInterface->Release(aSurf);
-                    VERIFY(MFX_ERR_NONE == sts, "Could not release output surface");
+                    } while (sts == MFX_WRN_IN_EXECUTION);
                 }
-
                 framenum++;
+
                 sts = outSurfaces->Release(outSurfaces);
                 VERIFY(MFX_ERR_NONE == sts, "ERROR - mfxSurfaceArray->Release failed");
-
                 outSurfaces = nullptr;
+
                 break;
+
             case MFX_ERR_MORE_DATA:
                 // The function requires more bitstream at input before decoding can proceed
                 if (isDraining)
@@ -305,6 +312,9 @@ int main(int argc, char *argv[]) {
 
 end:
     printf("Decode and VPP processed %d frames\n", framenum);
+
+    MFXVideoDECODE_VPP_Close(session);
+    MFXClose(session);
 
     // Clean up resources - It is recommended to close components first, before
     // releasing allocated surfaces, since some surfaces may still be locked by

@@ -41,6 +41,8 @@
     #error MFX_VERSION not defined
 #endif
 
+// Intel® Video Processing Library (Intel® VPL)
+
 void PrintHelp(char* strAppName, const char* strErrorMessage, ...) {
     printf("Encoding Sample Version %s\n\n", GetMSDKSampleVersion().c_str());
 
@@ -74,27 +76,25 @@ void PrintHelp(char* strAppName, const char* strErrorMessage, ...) {
     printf(
         "   [-dual_gfx::<on,off,adaptive>] - prefer processing on both iGfx and dGfx simultaneously\n");
 #endif
-#ifdef ONEVPL_EXPERIMENTAL
-    #if (defined(_WIN64) || defined(_WIN32))
+#if (defined(_WIN64) || defined(_WIN32))
     printf("   [-luid HighPart:LowPart] - setup adapter by LUID  \n");
     printf("                                 For example: \"0x0:0x8a46\"  \n");
-    #endif
+#endif
     printf("   [-pci domain:bus:device.function] - setup device with PCI \n");
     printf("                                 For example: \"0:3:0.0\"  \n");
-#endif
     printf(
         "   [-dGfx] - prefer processing on dGfx (by default system decides), also can be set with index, for example: '-dGfx 1' \n");
     printf("   [-iGfx] - prefer processing on iGfx (by default system decides)\n");
     printf("   [-AdapterNum] - specifies adapter number for processing, starts from 0\n");
     printf(
-        "   [-dispatcher:fullSearch]  - enable search for all available implementations in oneVPL dispatcher\n");
+        "   [-dispatcher:fullSearch]  - enable search for all available implementations in Intel® VPL dispatcher\n");
     printf(
-        "   [-dispatcher:lowLatency]  - enable limited implementation search and query in oneVPL dispatcher\n");
+        "   [-dispatcher:lowLatency]  - enable limited implementation search and query in Intel® VPL dispatcher\n");
 #ifdef MOD_ENC
     MOD_ENC_PRINT_HELP;
 #endif
     printf(
-        "   [-nv12|nv16|yuy2|uyvy|ayuv|rgb4|p010|y210|y410|a2rgb10|p016|p210|y216|i010|i420] - input color format (by default YUV420 is expected).\n");
+        "   [-nv12|nv16|yuy2|uyvy|ayuv|rgb4|bgr4|p010|y210|y410|a2rgb10|p016|p210|y216|i010|i420] - input color format (by default YUV420 is expected).\n");
 #if (defined(_WIN64) || defined(_WIN32))
     printf(
         "   [-yuv400] -  input color format is YUV400 (grayscale) and will be converted to NV12 for encoding (JPEG only).\n");
@@ -102,7 +102,7 @@ void PrintHelp(char* strAppName, const char* strErrorMessage, ...) {
     printf(
         "   [-msb10] - 10-bit color format is expected to have data in Most Significant Bits of words.\n                 (LSB data placement is expected by default).\n                 This option also disables data shifting during file reading.\n");
     printf(
-        "   [-ec::p010|yuy2|nv12|nv16|rgb4|ayuv|uyvy|y210|y410|p016|y216|i010|i420] - force output color format for encoder (conversion will be made if necessary). Default value: input color format\n");
+        "   [-ec::p010|yuy2|nv12|nv16|rgb4|bgr4|ayuv|uyvy|y210|y410|p016|y216|i010|i420] - force output color format for encoder (conversion will be made if necessary). Default value: input color format\n");
     printf(
         "   [-tff|bff] - input stream is interlaced, top|bottom fielf first, if not specified progressive is expected\n");
     printf("   [-bref] - arrange B frames in B pyramid reference structure\n");
@@ -272,12 +272,10 @@ void PrintHelp(char* strAppName, const char* strErrorMessage, ...) {
         "   [-usei]                  - insert user data unregistered SEI. eg: 7fc92488825d11e7bb31be2e44b06b34:0:MSDK (uuid:type<0-preifx/1-suffix>:message)\n");
     printf(
         "                              the suffix SEI for HEVCe can be inserted when CQP used or HRD disabled\n");
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
     printf(
         "   [-dblk_alpha]            - alpha deblocking parameter. In range[-12,12]. 0 by default.\n");
     printf(
         "   [-dblk_beta]             - beta deblocking parameter. In range[-12,12]. 0 by default.\n");
-#endif
     printf("   [-extbrc:<on,off,implicit>] - External BRC for AVC and HEVC encoders\n");
     printf("   [-encTools]     - enables enctools for AVC encoder\n");
     printf(
@@ -358,6 +356,10 @@ void PrintHelp(char* strAppName, const char* strErrorMessage, ...) {
     printf(
         "   [-angle 180] - enables 180 degrees picture rotation before encoding, CPU implementation by default. Rotation requires NV12 input. Options -tff|bff, -dstw, -dsth, -d3d are not effective together with this one, -nv12 is required.\n");
     printf("   [-opencl] - rotation implementation through OPENCL\n\n");
+#ifdef ONEVPL_EXPERIMENTAL
+    printf("   [-cfg::enc config]    - Set encoder options via string-api\n");
+    printf("   [-cfg::vpp config]    - Set VPP options via string-api\n");
+#endif
     printf(
         "Example: %s h264|h265|mpeg2|mvc|jpeg -i InputYUVFile -o OutputEncodedFile -w width -h height -angle 180 -opencl \n",
         strAppName);
@@ -542,6 +544,9 @@ mfxStatus ParseAdditionalParams(char* strInput[],
     else if (msdk_match(strInput[i], "-y216")) {
         pParams->FileInputFourCC = MFX_FOURCC_Y216;
     }
+    else if (msdk_match(strInput[i], "-bgr4")) {
+        pParams->FileInputFourCC = MFX_FOURCC_BGR4;
+    }
     else if (msdk_match(strInput[i], "-ec::yuy2")) {
         pParams->EncodeFourCC = MFX_FOURCC_YUY2;
     }
@@ -550,6 +555,9 @@ mfxStatus ParseAdditionalParams(char* strInput[],
     }
     else if (msdk_match(strInput[i], "-ec::rgb4")) {
         pParams->EncodeFourCC = MFX_FOURCC_RGB4;
+    }
+    else if (msdk_match(strInput[i], "-ec::bgr4")) {
+        pParams->EncodeFourCC = MFX_FOURCC_BGR4;
     }
     else if (msdk_match(strInput[i], "-ec::ayuv")) {
         pParams->EncodeFourCC = MFX_FOURCC_AYUV;
@@ -680,7 +688,6 @@ mfxStatus ParseAdditionalParams(char* strInput[],
     else if (msdk_match(strInput[i], "-rbf")) {
         pParams->bReadByFrame = true;
     }
-#ifdef ONEVPL_EXPERIMENTAL
     else if (msdk_match(strInput[i], "-pci")) {
         char deviceInfo[MSDK_MAX_FILENAME_LEN];
         VAL_CHECK(i + 1 >= nArgNum, i, strInput[i]);
@@ -714,7 +721,7 @@ mfxStatus ParseAdditionalParams(char* strInput[],
             return MFX_ERR_UNSUPPORTED;
         }
     }
-    #if defined(_WIN32)
+#if defined(_WIN32)
     else if (msdk_match(strInput[i], "-luid")) {
         // <HighPart:LowPart>
         char luid[MSDK_MAX_FILENAME_LEN];
@@ -741,7 +748,18 @@ mfxStatus ParseAdditionalParams(char* strInput[],
             return MFX_ERR_UNSUPPORTED;
         }
     }
-    #endif
+#endif
+#ifdef ONEVPL_EXPERIMENTAL
+    else if (msdk_match(strInput[i], "-cfg::enc")) {
+        VAL_CHECK(i + 1 >= nArgNum, i, strInput[i]);
+        i++;
+        pParams->m_encode_cfg = strInput[i];
+    }
+    else if (msdk_match(strInput[i], "-cfg::vpp")) {
+        VAL_CHECK(i + 1 >= nArgNum, i, strInput[i]);
+        i++;
+        pParams->m_vpp_cfg = strInput[i];
+    }
 #endif
     else {
         return MFX_ERR_NOT_FOUND;
@@ -1247,7 +1265,7 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
         }
         else if (msdk_match(strInput[i], "-dump")) {
             VAL_CHECK(i + 1 >= nArgNum, i, strInput[i]);
-            if (MFX_ERR_NONE != msdk_opt_read(strInput[++i], pParams->DumpFileName)) {
+            if (MFX_ERR_NONE != msdk_opt_read(strInput[++i], pParams->dump_file)) {
                 PrintHelp(strInput[0],
                           "File Name for dumping MSDK library configuration should be provided");
                 return MFX_ERR_UNSUPPORTED;
@@ -1311,7 +1329,6 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
             pParams->ExtBrcAdaptiveLTR = MFX_CODINGOPTION_OFF;
             ;
         }
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
         else if (msdk_match(strInput[i], "-dblk_alpha")) {
             VAL_CHECK(i + 1 >= nArgNum, i, strInput[i]);
             if (MFX_ERR_NONE != msdk_opt_read(strInput[++i], pParams->DeblockingAlphaTcOffset)) {
@@ -1326,7 +1343,6 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
                 return MFX_ERR_UNSUPPORTED;
             }
         }
-#endif
         else if (msdk_match(strInput[i], "-pp")) {
             pParams->shouldPrintPresets = true;
         }
@@ -1597,6 +1613,11 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
     if (MFX_CODEC_JPEG != pParams->CodecId && MFX_CODEC_HEVC != pParams->CodecId &&
         pParams->FileInputFourCC == MFX_FOURCC_YUY2 && !pParams->isV4L2InputEnabled) {
         PrintHelp(strInput[0], "-yuy2 option is supported only for JPEG or HEVC encoder");
+        return MFX_ERR_UNSUPPORTED;
+    }
+
+    if (MFX_CODEC_JPEG != pParams->CodecId && pParams->EncodeFourCC == MFX_FOURCC_BGR4) {
+        PrintHelp(strInput[0], "-ec::bgr4 option is supported only for JPEG encoder");
         return MFX_ERR_UNSUPPORTED;
     }
 

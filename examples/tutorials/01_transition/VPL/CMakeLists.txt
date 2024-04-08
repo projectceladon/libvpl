@@ -48,10 +48,29 @@ target_link_libraries(${TARGET} VPL::dispatcher)
 target_compile_definitions(${TARGET} PUBLIC -DUSE_VPL_INCLUDE)
 if(USE_VPL2X_INIT)
   target_compile_definitions(${TARGET} PUBLIC -DUSE_VPL2X_INIT)
+else()
+  target_compile_definitions(${TARGET} PUBLIC -DMFX_DEPRECATED_OFF)
 endif()
 
 install(TARGETS ${TARGET} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-                                  COMPONENT dev)
+                                  COMPONENT ${VPL_COMPONENT_DEV})
+
+# copy dependent dlls to target location
+if(WIN32)
+  if(${CMAKE_VERSION} VERSION_LESS "3.26")
+    message(
+      STATUS
+        "CMake Version less than 3.26, unable to copy dependent DLLs to target location"
+    )
+  else()
+    add_custom_command(
+      TARGET ${TARGET}
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${TARGET}>
+              $<TARGET_RUNTIME_DLLS:${TARGET}>
+      COMMAND_EXPAND_LISTS)
+  endif()
+endif()
 
 include(CTest)
 add_test(NAME ${TARGET}-test COMMAND ${TARGET})

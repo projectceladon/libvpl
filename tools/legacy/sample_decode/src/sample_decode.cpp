@@ -15,6 +15,8 @@
     #error MFX_VERSION not defined
 #endif
 
+// Intel® Video Processing Library (Intel® VPL)
+
 void PrintHelp(char* strAppName, const char* strErrorMessage) {
     printf("Decoding Sample Version %s\n\n", GetMSDKSampleVersion().c_str());
 
@@ -63,9 +65,9 @@ void PrintHelp(char* strAppName, const char* strErrorMessage) {
     printf(
         "   [-AdapterNum]             - specifies adapter number for processing, starts from 0\n");
     printf(
-        "   [-dispatcher:fullSearch]  - enable search for all available implementations in oneVPL dispatcher\n");
+        "   [-dispatcher:fullSearch]  - enable search for all available implementations in Intel® VPL dispatcher\n");
     printf(
-        "   [-dispatcher:lowLatency]  - enable limited implementation search and query in oneVPL dispatcher\n");
+        "   [-dispatcher:lowLatency]  - enable limited implementation search and query in Intel® VPL dispatcher\n");
 #if defined(LINUX32) || defined(LINUX64)
     printf("   [-device /path/to/device] - set graphics device for processing\n");
     printf("                                 For example: '-device /dev/dri/card0'\n");
@@ -73,17 +75,14 @@ void PrintHelp(char* strAppName, const char* strErrorMessage) {
     printf(
         "                                 If not specified, defaults to the first Intel device found on the system\n");
 #endif
-#ifdef ONEVPL_EXPERIMENTAL
-    #if (defined(_WIN64) || defined(_WIN32))
+#if (defined(_WIN64) || defined(_WIN32))
     printf("   [-luid HighPart:LowPart] - setup adapter by LUID  \n");
     printf("                                 For example: \"0x0:0x8a46\"  \n");
-    #endif
+#endif
     printf("   [-pci domain:bus:device.function] - setup device with PCI \n");
     printf("                                 For example: \"0:3:0.0\"  \n");
-#endif
-#if (MFX_VERSION >= MFX_VERSION_NEXT)
+
     printf("   [-ignore_level_constrain] - ignore level constrain\n");
-#endif
     printf("   [-disable_film_grain]     - disable film grain application(valid only for av1)\n");
     printf(
         "   [-api_ver_init::<1x,2x>]  - select the api version for the session initialization\n");
@@ -159,6 +158,12 @@ void PrintHelp(char* strAppName, const char* strErrorMessage) {
     printf("   [-jpeg_rotate n]          - rotate jpeg frame n degrees \n");
     printf("       n(90,180,270)         - number of degrees \n");
 #endif
+#ifdef ONEVPL_EXPERIMENTAL
+    printf("   [-cfg::dec config]    - Set decoder options via string-api\n");
+    printf("   [-cfg::vpp config]    - Set VPP options via string-api\n");
+#endif
+    printf(
+        "   [-dump fileName]         - dump MSDK components configuration to the file in text form\n");
 
 #if defined(_WIN32) || defined(_WIN64)
     printf("\nFeatures: \n");
@@ -456,8 +461,8 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
             }
         }
 #endif
-#ifdef ONEVPL_EXPERIMENTAL
-    #if (defined(_WIN64) || defined(_WIN32))
+
+#if (defined(_WIN64) || defined(_WIN32))
         else if (msdk_match(strInput[i], "-luid")) {
             // <HighPart:LowPart>
             char luid[MSDK_MAX_FILENAME_LEN];
@@ -486,7 +491,7 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
                 return MFX_ERR_UNSUPPORTED;
             }
         }
-    #endif
+#endif
         else if (msdk_match(strInput[i], "-pci")) {
             char deviceInfo[MSDK_MAX_FILENAME_LEN];
             if (i + 1 >= nArgNum) {
@@ -521,7 +526,7 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
                 return MFX_ERR_UNSUPPORTED;
             }
         }
-#endif
+
         else if (msdk_match(strInput[i], "-dGfx")) {
             pParams->adapterType = mfxMediaAdapterType::MFX_MEDIA_DISCRETE;
             if (i + 1 < nArgNum && isdigit(*strInput[1 + i])) {
@@ -720,12 +725,39 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
         else if (msdk_match(strInput[i], "-api_ver_init::2x")) {
             pParams->verSessionInit = API_2X;
         }
+#ifdef ONEVPL_EXPERIMENTAL
+        else if (msdk_match(strInput[i], "-cfg::dec")) {
+            if (i + 1 >= nArgNum) {
+                PrintHelp(strInput[0], "Not enough parameters for -cfg::dec");
+                return MFX_ERR_UNSUPPORTED;
+            }
+            i++;
+            pParams->m_decode_cfg = strInput[i];
+        }
+        else if (msdk_match(strInput[i], "-cfg::vpp")) {
+            if (i + 1 >= nArgNum) {
+                PrintHelp(strInput[0], "Not enough parameters for -cfg::vpp");
+                return MFX_ERR_UNSUPPORTED;
+            }
+            i++;
+            pParams->m_vpp_cfg = strInput[i];
+        }
+#endif
+        else if (msdk_match(strInput[i], "-dump")) {
+            if (i + 1 >= nArgNum) {
+                PrintHelp(strInput[0],
+                          "File Name for dumping MSDK library configuration should be provided");
+                return MFX_ERR_UNSUPPORTED;
+            }
+            i++;
+            pParams->dump_file = strInput[i];
+        }
         else // 1-character options
         {
             switch (strInput[i][1]) {
                 case 'p':
                     ++i;
-                    printf("WARNING: plugins are deprecated and not supported by VPL RT \n");
+                    printf("WARNING: plugins are deprecated and not supported by Intel® VPL RT \n");
                     break;
                 case 'i':
                     if (++i < nArgNum) {
@@ -779,7 +811,7 @@ mfxStatus ParseInputString(char* strInput[], mfxU32 nArgNum, sInputParams* pPara
         pParams->nAsyncDepth = 4; //set by default;
     }
 
-    if (!pParams->bUseHWLib) { // vpl cpu plugin
+    if (!pParams->bUseHWLib) { // Intel® VPL cpu plugin
         pParams->nAsyncDepth = 1;
     }
 
@@ -807,8 +839,8 @@ int main(int argc, char* argv[]) {
     }
     MSDK_CHECK_PARSE_RESULT(sts, MFX_ERR_NONE, 1);
 
-    // if version is >= 2000, sw lib is vpl
-    // if outI420 is true, it means sample will convert decode output to I420, which is useless in vpl.
+    // if version is >= 2000, sw lib is Intel® VPL
+    // if outI420 is true, it means sample will convert decode output to I420, which is useless in Intel® VPL.
     // we set foucc to I420 back and set outI420 to false
     if (Params.bUseHWLib == false && Params.outI420 == true) {
         Params.fourcc  = MFX_FOURCC_I420;

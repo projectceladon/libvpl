@@ -23,6 +23,8 @@
 #include <iomanip>
 #include <memory>
 
+// Intel® Video Processing Library (Intel® VPL)
+
 using namespace std;
 using namespace TranscodingSample;
 
@@ -78,6 +80,7 @@ Launcher::Launcher()
         : performance_file_name(),
           parameter_file_name(),
           session_descriptions(),
+          surface_wait_interval(MSDK_SURFACE_WAIT_INTERVAL),
           m_pThreadContextArray(),
           m_pAllocArray(),
           m_InputParamsArray(),
@@ -149,6 +152,7 @@ mfxStatus Launcher::Init(int argc, char* argv[]) {
     performance_file_name = parser.GetPerformanceFile();
     parameter_file_name   = parser.GetParameterFile();
     session_descriptions  = parser.GetSessionDescriptions();
+    surface_wait_interval = parser.GetParameterSurfaceWaitInterval();
 
     m_CSConfig.Tracer = &m_Tracer;
 
@@ -185,20 +189,18 @@ mfxStatus Launcher::Init(int argc, char* argv[]) {
 
         m_pLoader->SetAdapterType(m_InputParamsArray[0].adapterType);
 
-#ifdef ONEVPL_EXPERIMENTAL
         if (m_InputParamsArray[0].PCIDeviceSetup)
             m_pLoader->SetPCIDevice(m_InputParamsArray[0].PCIDomain,
                                     m_InputParamsArray[0].PCIBus,
                                     m_InputParamsArray[0].PCIDevice,
                                     m_InputParamsArray[0].PCIFunction);
 
-    #if defined(_WIN32)
+#if defined(_WIN32)
         if (m_InputParamsArray[0].luid.HighPart > 0 || m_InputParamsArray[0].luid.LowPart > 0)
             m_pLoader->SetupLUID(m_InputParamsArray[0].luid);
-    #else
+#else
         if (m_InputParamsArray[0].DRMRenderNodeNum > 0)
             m_pLoader->SetupDRMRenderNodeNum(m_InputParamsArray[0].DRMRenderNodeNum);
-    #endif
 #endif
 
         sts = m_pLoader->ConfigureAndEnumImplementations(m_InputParamsArray[0].libType,
@@ -352,6 +354,12 @@ mfxStatus Launcher::Init(int argc, char* argv[]) {
                     libvaBackend         = params.libvaBackend;
 
                     /* Rendering case */
+                    if (InputParams.strDevicePath.empty() && InputParams.verSessionInit == API_2X) {
+                        InputParams.strDevicePath =
+                            "/dev/dri/renderD" +
+                            std::to_string(m_pLoader->GetDRMRenderNodeNumUsed());
+                    }
+
                     hwdev.reset(CreateVAAPIDevice(InputParams.strDevicePath, params.libvaBackend));
                     if (!hwdev.get()) {
                         printf("error: failed to initialize VAAPI device\n");
@@ -405,6 +413,13 @@ mfxStatus Launcher::Init(int argc, char* argv[]) {
                 }
                 else /* NO RENDERING*/
                 {
+                    if (m_InputParamsArray[i].strDevicePath.empty() &&
+                        m_InputParamsArray[i].verSessionInit == API_2X) {
+                        m_InputParamsArray[i].strDevicePath =
+                            "/dev/dri/renderD" +
+                            std::to_string(m_pLoader->GetDRMRenderNodeNumUsed());
+                    }
+
                     hwdev.reset(CreateVAAPIDevice(m_InputParamsArray[i].strDevicePath));
 
                     if (!hwdev.get()) {
@@ -501,6 +516,8 @@ mfxStatus Launcher::Init(int argc, char* argv[]) {
             pThreadPipeline->pPipeline->SetAdapterNum(m_pLoader->GetDeviceIDAndAdapter().second);
         }
 
+        pThreadPipeline->pPipeline->SetSurfaceWaitInterval(surface_wait_interval);
+
         pThreadPipeline->pPipeline->SetSyncOpTimeout(m_InputParamsArray[i].nSyncOpTimeout);
 
         pThreadPipeline->pBSProcessor = m_pExtBSProcArray.back().get();
@@ -515,7 +532,9 @@ mfxStatus Launcher::Init(int argc, char* argv[]) {
         else if (m_InputParamsArray[i].DecodeId == MFX_CODEC_RGB4 ||
                  m_InputParamsArray[i].DecodeId == MFX_CODEC_I420 ||
                  m_InputParamsArray[i].DecodeId == MFX_CODEC_NV12 ||
-                 m_InputParamsArray[i].DecodeId == MFX_CODEC_P010) {
+                 m_InputParamsArray[i].DecodeId == MFX_CODEC_P010 ||
+                 m_InputParamsArray[i].DecodeId == MFX_CODEC_YUY2 ||
+                 m_InputParamsArray[i].DecodeId == MFX_CODEC_Y210) {
             // YUV reader for RGB4 overlay and raw input
             yuvreader.reset(new CSmplYUVReader());
         }

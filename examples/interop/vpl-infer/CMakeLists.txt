@@ -47,10 +47,10 @@ target_link_libraries(${TARGET} VPL::dispatcher)
 
 find_package(OpenVINO COMPONENTS Runtime)
 if(OpenVINO_FOUND)
-  message(STATUS "OpenVINO found")
+  message(STATUS "Intel® Distribution of OpenVINO™ toolkit found")
   target_link_libraries(${TARGET} openvino::runtime)
 else()
-  message(FATAL_ERROR "OpenVINO not found")
+  message(FATAL_ERROR "Intel® Distribution of OpenVINO™ toolkit not found")
 endif()
 
 if(UNIX)
@@ -133,6 +133,23 @@ else()
     target_link_libraries(${TARGET} "$ENV{OpenCL_LIBRARY_PATH}\\OpenCL.lib")
     target_include_directories(${TARGET} PUBLIC $ENV{OpenCL_INCLUDE_DIRS})
     add_definitions(-DZEROCOPY)
+  endif()
+endif()
+
+# copy dependent dlls to target location
+if(WIN32)
+  if(${CMAKE_VERSION} VERSION_LESS "3.26")
+    message(
+      STATUS
+        "CMake Version less than 3.26, unable to copy dependent DLLs to target location"
+    )
+  else()
+    add_custom_command(
+      TARGET ${TARGET}
+      POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${TARGET}>
+              $<TARGET_RUNTIME_DLLS:${TARGET}>
+      COMMAND_EXPAND_LISTS)
   endif()
 endif()
 

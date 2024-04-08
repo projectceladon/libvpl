@@ -9,7 +9,7 @@
 
 #include "vpl/mfxdefs.h"
 #if defined(_WIN32) || defined(_WIN64)
-    #include "mfxadapter.h"
+    #include "vpl/mfxadapter.h"
 #endif
 
 #include "pipeline_transcode.h"
@@ -69,6 +69,8 @@ protected:
     std::string performance_file_name;
     std::string parameter_file_name;
     std::vector<std::string> session_descriptions;
+    mfxU32
+        surface_wait_interval; //Could define it as an input for par of each pipline. But this is for debug purpose only, so define it as sample_multi_transcode input argv here as convenient.
     // threads contexts to process playlist
     std::vector<std::unique_ptr<ThreadTranscodeContext>> m_pThreadContextArray;
     // allocator for each session
