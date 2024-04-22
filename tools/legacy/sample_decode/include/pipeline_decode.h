@@ -105,7 +105,7 @@ struct sInputParams {
 #if defined(LIBVA_SUPPORT)
     mfxI32 libvaBackend;
 #endif // defined(MFX_LIBVA_SUPPORT)
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     std::string strDevicePath;
 #endif
 #if (defined(_WIN64) || defined(_WIN32)) && (MFX_VERSION >= 1031)
@@ -302,7 +302,7 @@ protected: // variables
     mfxExtMasteringDisplayColourVolume m_DisplayColor;
     std::vector<mfxExtBuffer*> m_OutSurfaceExtParams;
 
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     std::string m_strDevicePath; //path to device for processing
 #endif
     CHWDevice* m_hwdev;

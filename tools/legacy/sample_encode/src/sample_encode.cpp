@@ -11,6 +11,7 @@
 #include <memory>
 #include <regex>
 #include <string>
+#include <cmath>
 #include "pipeline_encode.h"
 #include "pipeline_region_encode.h"
 #include "pipeline_user.h"

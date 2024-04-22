@@ -113,7 +113,7 @@ struct sInputParams {
     MemType memType;
     bool bUseHWLib; // true if application wants to use HW MSDK library
 
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     std::string strDevicePath;
 #endif
 #if (defined(_WIN64) || defined(_WIN32)) && (MFX_VERSION >= 1031)
@@ -413,7 +413,7 @@ protected:
     mfxU32 m_nNumView;
     mfxU32 m_nFramesToProcess; // number of frames to process
 
-#if defined(LINUX32) || defined(LINUX64)
+#if defined(LINUX32) || defined(LINUX64) || defined(ANDROID)
     std::string m_strDevicePath; //path to device for processing
 #endif
 

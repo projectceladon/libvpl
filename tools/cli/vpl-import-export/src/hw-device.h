@@ -21,7 +21,7 @@
 #include <unistd.h>
 
 #include "va/va.h"
-#include "va/va_drm.h"
+#include "va//drm/va_drm.h"
 
 #include "va/va_drmcommon.h"
 
