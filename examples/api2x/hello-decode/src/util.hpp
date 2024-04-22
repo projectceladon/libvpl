@@ -38,7 +38,7 @@ enum {
 
 #ifdef LIBVA_SUPPORT
     #include "va/va.h"
-    #include "va/va_drm.h"
+    #include "va//drm/va_drm.h"
 #endif
 
 #define WAIT_100_MILLISECONDS 100
