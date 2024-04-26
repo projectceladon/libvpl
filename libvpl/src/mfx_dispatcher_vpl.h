@@ -48,9 +48,14 @@ typedef char CHAR_TYPE;
         #define MSDK_LIB_NAME L"libmfxhw64."
     #endif
     #define ONEVPL_PRIORITY_PATH_VAR L"ONEVPL_PRIORITY_PATH"
-#elif defined(__linux__)
-    // Linux x64
-    #define MSDK_LIB_NAME            "libmfxhw64."
+#elif defined(__linux__) || defined ANDROID
+    #if defined __i386
+        // Linux or Android 32
+        #define MSDK_LIB_NAME "libmfxhw32."
+    #else
+        // Linux x64
+        #define MSDK_LIB_NAME            "libmfxhw64."
+    #endif
     #define ONEVPL_PRIORITY_PATH_VAR "ONEVPL_PRIORITY_PATH"
 #endif
 

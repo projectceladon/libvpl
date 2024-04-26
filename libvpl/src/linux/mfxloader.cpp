@@ -27,17 +27,33 @@
 namespace MFX {
 
 #if defined(__x86_64__) || (INTPTR_MAX == INT64_MAX)
+#ifdef ANDROID
+    #define LIBMFXSW "libmfxsw64.so"
+    #define LIBMFXHW "libmfxhw64.so"
+
+    #define ONEVPLSW "libvplswref64.so"
+    #define ONEVPLHW "libmfx-gen.so"
+#else
     #define LIBMFXSW "libmfxsw64.so.1"
     #define LIBMFXHW "libmfxhw64.so.1"
 
     #define ONEVPLSW "libvplswref64.so.1"
     #define ONEVPLHW "libmfx-gen.so.1.2"
+#endif
 #elif defined(__i386__) || (INTPTR_MAX == INT32_MAX)
+#ifdef ANDROID
+    #define LIBMFXSW "libmfxsw32.so"
+    #define LIBMFXHW "libmfxhw32.so"
+
+    #define ONEVPLSW "libvplswref32.so"
+    #define ONEVPLHW "libmfx-gen.so"
+#else
     #define LIBMFXSW "libmfxsw32.so.1"
     #define LIBMFXHW "libmfxhw32.so.1"
 
     #define ONEVPLSW "libvplswref32.so.1"
     #define ONEVPLHW "libmfx-gen.so.1.2"
+#endif
 #else
     #error Unsupported architecture
 #endif

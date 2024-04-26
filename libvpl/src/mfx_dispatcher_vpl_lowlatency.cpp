@@ -19,9 +19,19 @@
         #define LIB_MSDK   L"libmfxhw64.dll"
     #endif
 #elif defined(__linux__)
-    // Linux x64
-    #define LIB_ONEVPL "libmfx-gen.so.1.2"
-    #define LIB_MSDK   "libmfxhw64.so.1"
+    #ifdef ANDROID
+        #if defined __i386
+            #define LIB_ONEVPL "libmfx-gen.so"
+            #define LIB_MSDK   "libmfxhw32.so"
+        #else
+            #define LIB_ONEVPL "libmfx-gen.so"
+            #define LIB_MSDK   "libmfxhw64.so"
+        #endif
+    #else
+        // Linux x64
+        #define LIB_ONEVPL "libmfx-gen.so.1.2"
+        #define LIB_MSDK   "libmfxhw64.so.1"
+    #endif
 #endif
 
 //Intel® Video Processing Library (Intel® VPL) low latency dispatcher
@@ -195,6 +205,15 @@ mfxStatus LoaderCtxVPL::LoadLibsFromMultipleDirs(LibType libType) {
     // clang-format off
 
     // standard paths for RT installation on Linux
+    #ifdef ANDROID
+    std::vector<std::string> llSearchDir = {
+        "/usr/lib/x86_64-linux-gnu",
+        "/lib",
+        "/vendor/lib",
+        "/lib64",
+        "/vendor/lib64",
+    };
+    #else
     std::vector<std::string> llSearchDir = {
         "/usr/lib/x86_64-linux-gnu",
         "/lib",
@@ -202,6 +221,7 @@ mfxStatus LoaderCtxVPL::LoadLibsFromMultipleDirs(LibType libType) {
         "/lib64",
         "/usr/lib64",
     };
+    #endif
 
     // clang-format on
 
