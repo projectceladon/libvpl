@@ -129,7 +129,11 @@ mfxU32 LoaderCtxVPL::ParseEnvSearchPaths(const CHAR_TYPE *envVarName,
 #else
     CHAR_TYPE *envVar = getenv(envVarName);
     if (!envVar)
+#ifdef ANDROID
+        envVar = (CHAR_TYPE *)ONEVPL_SEARCH_PATH;
+#else	
         return 0; // environment variable not defined
+#endif
 
     // parse env variable into individual directories
     std::stringstream envPath((CHAR_TYPE *)envVar);
@@ -237,8 +241,12 @@ mfxStatus LoaderCtxVPL::SearchDirForLibs(STRING_TYPE searchDir,
             if (strstr(currFile->d_name, ".so")) {
                 // library names must begin with "libvpl*" or "libmfx*"
                 if ((strstr(currFile->d_name, "libvpl") != currFile->d_name) &&
+                #ifdef ANDROID
+                    (strstr(currFile->d_name, "libmfx") != currFile->d_name))
+                #else
                     (strcmp(currFile->d_name, "libmfx-gen.so.1.2") != 0) &&
                     (strcmp(currFile->d_name, "libmfxhw64.so.1") != 0))
+                #endif
                     continue;
 
                 // special case: do not include dispatcher itself (libmfx.so*, libvpl.so*) or tracer library
@@ -410,6 +418,15 @@ mfxU32 LoaderCtxVPL::GetSearchPathsSystemDefault(std::list<STRING_TYPE> &searchD
     searchDirs.clear();
 
 #ifdef __linux__
+    #ifdef ANDROID
+    searchDirs.push_back("/usr/lib/x86_64-linux-gnu");
+
+    // Add other default paths
+    searchDirs.push_back("/lib");
+    searchDirs.push_back("/vendor/lib");
+    searchDirs.push_back("/lib64");
+    searchDirs.push_back("/vendor/lib64");
+    #else
     // Add the standard path for libmfx1 install in Ubuntu
     searchDirs.push_back("/usr/lib/x86_64-linux-gnu");
 
@@ -418,6 +435,7 @@ mfxU32 LoaderCtxVPL::GetSearchPathsSystemDefault(std::list<STRING_TYPE> &searchD
     searchDirs.push_back("/usr/lib");
     searchDirs.push_back("/lib64");
     searchDirs.push_back("/usr/lib64");
+    #endif
 #endif
 
     return (mfxU32)searchDirs.size();
