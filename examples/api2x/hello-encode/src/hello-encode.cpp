@@ -14,8 +14,8 @@
 
 #define TARGETKBPS                 4000
 #define FRAMERATE                  30
-#define OUTPUT_FILE                "out.h265"
-#define BITSTREAM_BUFFER_SIZE      2000000
+#define OUTPUT_FILE                "out.bs"
+#define BITSTREAM_BUFFER_SIZE      20000000
 #define MAJOR_API_VERSION_REQUIRED 2
 #define MINOR_API_VERSION_REQUIRED 2
 
@@ -25,9 +25,10 @@ void Usage(void) {
     printf("     -i input file name (NV12 raw frames)\n");
     printf("     -w input width\n");
     printf("     -h input height\n\n");
-    printf("   Example:  hello-encode -i in.NV12 -w 320 -h 240\n");
+    printf("     -v encoder format: vp9, h265. H265 By default.\n\n");
+    printf("   Example:  hello-encode -i in.NV12 -w 320 -h 240 -v h265\n");
     printf("   To view:  ffplay %s\n\n", OUTPUT_FILE);
-    printf(" * Encode raw frames to HEVC/H265 elementary stream in %s\n\n", OUTPUT_FILE);
+    printf(" * Encode raw frames to VP9, AVC/H264, HEVC/H265 elementary stream in %s\n\n", OUTPUT_FILE);
     printf("   GPU native color format is "
            "NV12\n");
     return;
@@ -61,6 +62,18 @@ int main(int argc, char *argv[]) {
         return 1; // return 1 as error code
     }
 
+    uint32_t codecFormat = 0;
+    switch (cliParams.codecFormat) {
+        case AVC_FORMAT:
+            codecFormat = MFX_CODEC_AVC;
+            break;
+        case VP9_FORMAT:
+            codecFormat = MFX_CODEC_VP9;
+            break;
+        default:
+            codecFormat = MFX_CODEC_HEVC;
+    }
+
     source = fopen(cliParams.infileName, "rb");
     VERIFY(source, "Could not open input file");
 
@@ -83,7 +96,7 @@ int main(int argc, char *argv[]) {
     cfg[1] = MFXCreateConfig(loader);
     VERIFY(NULL != cfg[1], "MFXCreateConfig failed")
     cfgVal[1].Type     = MFX_VARIANT_TYPE_U32;
-    cfgVal[1].Data.U32 = MFX_CODEC_HEVC;
+    cfgVal[1].Data.U32 = codecFormat;
     sts                = MFXSetConfigFilterProperty(
         cfg[1],
         (mfxU8 *)"mfxImplDescription.mfxEncoderDescription.encoder.CodecID",
@@ -108,7 +121,7 @@ int main(int argc, char *argv[]) {
     ShowImplementationInfo(loader, 0);
 
     // Initialize encode parameters
-    encodeParams.mfx.CodecId                 = MFX_CODEC_HEVC;
+    encodeParams.mfx.CodecId                 = codecFormat;
     encodeParams.mfx.TargetUsage             = MFX_TARGETUSAGE_BALANCED;
     encodeParams.mfx.TargetKbps              = TARGETKBPS;
     encodeParams.mfx.RateControlMethod       = MFX_RATECONTROL_VBR;
