@@ -47,6 +47,12 @@ enum {
 #define MAX_HEIGHT            2160
 #define IS_ARG_EQ(a, b)       (!strcmp((a), (b)))
 
+#define VP9_MAX_WIDTH         8192
+#define VP9_MAX_HEIGHT        8192
+
+#define HEVC_MAX_WIDTH        16384
+#define HEVC_MAX_HEIGHT       12288
+
 #define VERIFY(x, y)       \
     if (!(x)) {            \
         printf("%s\n", y); \
@@ -67,9 +73,16 @@ enum ParamGroup {
     PARAMS_TRANSCODE
 };
 
+enum FormatGroup {
+    HEVC_FORMAT = 0,
+    AVC_FORMAT,
+    VP9_FORMAT
+};
+
 typedef struct _Params {
     char *infileName;
     char *inmodelName;
+    int  codecFormat;
 
     mfxU16 srcWidth;
     mfxU16 srcHeight;
@@ -93,6 +106,23 @@ bool ValidateSize(char *in, mfxU16 *vsize, mfxU32 vmax) {
 
     *vsize = 0;
     return false;
+}
+
+int ValidateFormat(char *in) {
+    int format = HEVC_FORMAT;
+    if (in) {
+        if (!(strcmp(in, "h265") && strcmp(in, "H265"))) {
+            format = HEVC_FORMAT;
+	}
+	else if (!(strcmp(in, "h264") && strcmp(in, "H264"))) {
+            format = AVC_FORMAT;
+	}
+	else if (!(strcmp(in, "vp9") && strcmp(in, "VP9"))) {
+            format = VP9_FORMAT;
+        }
+    }
+
+    return format;
 }
 
 bool ParseArgsAndValidate(int argc, char *argv[], Params *params, ParamGroup group) {
@@ -126,12 +156,16 @@ bool ParseArgsAndValidate(int argc, char *argv[], Params *params, ParamGroup gro
                 return false;
             }
         }
+	else if (IS_ARG_EQ(s, "v")) {
+            params->codecFormat = ValidateFormat(argv[idx++]);
+	    printf("DEBUG - using encoder %d\n", params->codecFormat);
+	}
         else if (IS_ARG_EQ(s, "w")) {
-            if (!ValidateSize(argv[idx++], &params->srcWidth, MAX_WIDTH))
+            if (!ValidateSize(argv[idx++], &params->srcWidth, HEVC_MAX_WIDTH))
                 return false;
         }
         else if (IS_ARG_EQ(s, "h")) {
-            if (!ValidateSize(argv[idx++], &params->srcHeight, MAX_HEIGHT))
+            if (!ValidateSize(argv[idx++], &params->srcHeight, HEVC_MAX_HEIGHT))
                 return false;
         }
     }
@@ -148,6 +182,24 @@ bool ParseArgsAndValidate(int argc, char *argv[], Params *params, ParamGroup gro
             printf("ERROR - source width/height required\n");
             return false;
         }
+    }
+
+    switch(params->codecFormat) {
+        case AVC_FORMAT:
+            if (params->srcWidth > MAX_WIDTH || params->srcHeight > MAX_HEIGHT) {
+		    printf("ERROR - MAX AVC width/height is %dx%d\n", MAX_WIDTH, MAX_HEIGHT);
+		    return false;
+	    }
+	case VP9_FORMAT:
+            if (params->srcWidth > VP9_MAX_WIDTH || params->srcHeight > VP9_MAX_HEIGHT) {
+                    printf("ERROR - MAX VP9 width/height is %dx%d\n", VP9_MAX_WIDTH, VP9_MAX_HEIGHT);
+                    return false;
+            }
+	case HEVC_FORMAT:
+	    if (params->srcWidth > HEVC_MAX_WIDTH || params->srcHeight > HEVC_MAX_HEIGHT) {
+                    printf("ERROR - MAX HEVC width/height is %dx%d\n", HEVC_MAX_WIDTH, HEVC_MAX_HEIGHT);
+                    return false;
+            }
     }
 
     return true;
