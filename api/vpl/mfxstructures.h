@@ -2377,6 +2377,10 @@ enum {
     */
     MFX_EXTBUFF_EXPORT_SHARING_DESC_OCL = MFX_MAKEFOURCC('E', 'O', 'C', 'L'),
 #endif
+    /*!
+    See the mfxExtDecryptConfig structure for more details.
+    */
+    MFX_EXTBUFF_DECRYPT_CONFIG          = MFX_MAKEFOURCC('D', 'E', 'C', 'R'),
 };
 
 /* VPP Conf: Do not use certain algorithms  */
@@ -5043,6 +5047,28 @@ typedef struct {
 } mfxExtTuneEncodeQuality;
 MFX_PACK_END()
 #endif
+
+enum struct EncryptionScheme {
+  kUnencrypted = 0,
+  kCenc,  // 'cenc' subsample encryption using AES-CTR mode.
+  kCbcs,  // 'cbcs' pattern encryption using AES-CBC mode.
+  kMaxValue = kCbcs
+};
+
+typedef struct {
+    mfxU32 clear_bytes;
+    mfxU32 cypher_bytes;
+} SubsampleEntry;
+
+typedef struct {
+    mfxExtBuffer Header;      /*!< Extension buffer header. Header.BufferId must be equal to MFX_EXTBUFF_DECRYPT_CONFIG. */
+    EncryptionScheme encryption_scheme;
+    mfxU8 hw_key_id[16];
+    mfxU8 iv[16];
+    mfxU32 session;
+    mfxU32 num_subsamples;
+    SubsampleEntry *subsamples;
+} mfxExtDecryptConfig;
 
 #ifdef ONEVPL_EXPERIMENTAL
 /* The mfxAutoSelectImplType enumerator specifies the method for automatically selecting an implementation. */
