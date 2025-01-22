@@ -2457,6 +2457,10 @@ enum {
         See the mfxExtDecryptConfig structure for more details.
     */
     MFX_EXTBUFF_DECRYPT_CONFIG = MFX_MAKEFOURCC('D', 'E', 'C', 'R'),
+    /*!
+        See the mfxExtSecureCodec structure for more details.
+    */
+    MFX_EXTBUFF_SECURE_CODEC = MFX_MAKEFOURCC('S', 'E', 'C', 'U'),
 };
 
 /* VPP Conf: Do not use certain algorithms  */
@@ -5157,6 +5161,11 @@ typedef struct {
     mfxU32 num_subsamples;
     SubsampleEntry *subsamples;
 } mfxExtDecryptConfig;
+
+typedef struct {
+    mfxExtBuffer Header;
+    mfxU8 on;
+} mfxExtSecureCodec;
 
 /*! The mfxAISuperResolutionMode enumerator specifies the mode of AI based super resolution. */
 typedef enum {
